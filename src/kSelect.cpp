@@ -85,7 +85,7 @@ inline void findLocalCount(localData &local, const std::vector<uint32_t> &arr, c
     // check conditions of pivot being out of local range, where we can instantly know the value of count
     if (((k < n / 2) && (p < local.localMin)) || ((k >= n / 2) && (p > local.localMax))) // if pivot is less than local min, when we count the less than / greater than local max, when we count the greater than
         count = 0;                                                                       // no elements are less than the pivot / greater than the pivot
-    else if (((k < n / 2) && (p > local.localMax)) || ((k >= n / 2) && (p < local.localMin)))
+    else if (((k < n / 2) && (p >= local.localMax)) || ((k >= n / 2) && (p < local.localMin)))
         count = arr.size();
     else
     {
@@ -106,7 +106,7 @@ void findClosest(uint32_t &closest, const std::vector<uint32_t> &arr, const uint
 { // check for custom reduction with template functions
     closest = arr[0];
 #pragma omp parallel for
-    for (size_t i = 0; i < arr.size(); i++)
+    for (size_t i = 1; i < arr.size(); i++)
     {
         if (comp(arr[i], p))
         {
@@ -172,7 +172,6 @@ void localFn(uint32_t kth, const std::vector<uint32_t> &arr, const size_t k, con
     while (true)
     {
         p = p + (max - min) * (k - countSum) / n; // find pivot
-        // printf("p: %d\n", p);
 
         findLocalCount(local, arr, p, comp, k, n); // find local count
 
@@ -180,6 +179,7 @@ void localFn(uint32_t kth, const std::vector<uint32_t> &arr, const size_t k, con
             MPI_Send(&local.count, 1, MPI_UINT32_T, 0, 0, MPI_COMM_WORLD);
         else
         { // gather all local counts
+            countSum = local.count;
             for (size_t i = 1; i < np; i++)
             {
                 uint32_t temp;
@@ -208,7 +208,7 @@ void localFn(uint32_t kth, const std::vector<uint32_t> &arr, const size_t k, con
             uint32_t temp;
             MPI_Recv(&temp, 1, MPI_UINT32_T, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             if (comp(temp, p))
-                kth = comp(kth, temp) ? temp : kth;            
+                kth = comp(kth, temp) ? temp : kth;
         }
         printf("kth element: %d\n", kth);
     }
