@@ -2,7 +2,7 @@
 #include <algorithm>
 #include <mpi.h>
 #include "kSelect.hpp"
-#include "quickSelect.hpp"
+#include "heurQuickSelect.hpp"
 
 #define k 2
 
@@ -45,16 +45,16 @@ int main()
     switch (SelfTID)
     {
     case 0:
-        quickSelect(kth, arrs[0], k, 8, NumTasks);
+        heurQuickSelect(kth, arrs[0], k, 8, NumTasks);
         break;
     case 1:
-        quickSelect(kth, arrs[1], k, 8, NumTasks);
+        heurQuickSelect(kth, arrs[1], k, 8, NumTasks);
         break;
     case 2:
-        quickSelect(kth, arrs[2], k, 8, NumTasks);
+        heurQuickSelect(kth, arrs[2], k, 8, NumTasks);
         break;
     case 3:
-        quickSelect(kth, arrs[3], k, 8, NumTasks);
+        heurQuickSelect(kth, arrs[3], k, 8, NumTasks);
         break;
     }
 
