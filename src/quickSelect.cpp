@@ -1,6 +1,5 @@
-#include <omp.h>
 #include <mpi.h>
-#include "kSelect.hpp"
+#include "quickSelect.hpp"
 
 inline bool lessEqualThan(const uint32_t &a, const uint32_t &b)
 {
@@ -22,27 +21,19 @@ inline bool greaterThan(const uint32_t &a, const uint32_t &b)
     return a > b;
 }
 
-inline bool checkCond(const size_t k, const size_t n, const uint32_t countSum)
-{
-    if (k < n / 2)
-        return ((countSum == k) || (countSum == (k - 1)) || (countSum == (k + 1))) ? true : false;
-    else
-        return ((countSum == (n - k)) || (countSum == (n - k - 1)) || (countSum == (n - k + 1))) ? true : false;
-}
-
 inline void setComp(bool (*&comp)(const uint32_t &, const uint32_t &), const size_t k, const size_t n, const size_t countSum)
 {
-    if ((countSum == (k + 1)) || (countSum == (n - k - 1)))
+    if (countSum == (k + 1))
         comp = lessThan; // the next element less than the pivot is the kth element
-    else if ((countSum == k) || (countSum == (n - k)))
+    else if (countSum == k)
         comp = lessEqualThan; // the next element less than or equal to the pivot is the kth element
-    else                      // ((countSum == (k - 1)) || (countSum == (n - k + 1)))
+    else                      // ((countSum == (k - 1))
         comp = greaterThan;   // the next element bigger than the pivot is the kth element
 
     return;
 }
 
-void findLocalMinMax(localData &local, const std::vector<uint32_t> &arr)
+void findLocalMinMax(localDataQuick &local, const std::vector<uint32_t> &arr)
 {
     uint32_t localmin = arr[0];
 
@@ -78,31 +69,24 @@ void findLocalMinMax(localData &local, const std::vector<uint32_t> &arr)
     return;
 }
 
-inline void findLocalCount(localData &local, const std::vector<uint32_t> &arr, const uint32_t &p, bool (*comp)(const uint32_t &, const uint32_t &), const size_t k, const size_t n)
+void localSorting(localDataQuick &local, std::vector<uint32_t> &arr, const uint32_t start, const uint32_t end, const uint32_t p)
 {
-    uint32_t count = 0;
-
-    // check conditions of pivot being out of local range, where we can instantly know the value of count
-    if (((k < n / 2) && (p < local.localMin)) || ((k >= n / 2) && (p > local.localMax))) // if pivot is less than local min, when we count the less than / greater than local max, when we count the greater than
-        count = 0;                                                                       // no elements are less than the pivot / greater than the pivot
-    else if (((k < n / 2) && (p >= local.localMax)) || ((k >= n / 2) && (p < local.localMin)))
-        count = arr.size();
-    else
+    uint32_t i = start, j = end;
+    while (true)
     {
-#pragma omp parallel for reduction(+ : count)
-        for (size_t i = 0; i < arr.size(); i++) // count elements less than or greater than pivot, depending on the percentile of k
-        {
-            if (comp(arr[i], p))
-                count++;
-        }
+        while ((arr[i] <= p) && i <= j)
+            i++;
+        while ((arr[j] > p) && i < j)
+            j--;
+        if (i < j)
+            std::swap(arr[i], arr[j]);
+        else if (i == (j + 1) || i == j)
+            break;
     }
-
-    local.count = count;
-
-    return;
+    local.count = i;
 }
 
-void findClosest(uint32_t &closest, const std::vector<uint32_t> &arr, const uint32_t &p, bool (*comp)(const uint32_t &, const uint32_t &))
+void findClosest(uint32_t &closest, const std::vector<uint32_t> &arr, const uint32_t &p, bool (*comp)(const uint32_t &, const uint32_t &), const size_t k)
 { // check for custom reduction with template functions
     closest = arr[0];
 #pragma omp parallel for
@@ -118,10 +102,10 @@ void findClosest(uint32_t &closest, const std::vector<uint32_t> &arr, const uint
     return;
 }
 
-void localFn(uint32_t kth, std::vector<uint32_t> &arr, const size_t k, const size_t n, const size_t np)
+void quickSelect(uint32_t kth, std::vector<uint32_t> &arr, const size_t k, const size_t n, const size_t np)
 {
     // find local min
-    localData local;
+    localDataQuick local;
     findLocalMinMax(local, arr);
 
     uint32_t min = local.localMin, max = local.localMax;
@@ -164,15 +148,15 @@ void localFn(uint32_t kth, std::vector<uint32_t> &arr, const size_t k, const siz
     MPI_Bcast(&max, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
     // printf("whole max %d, process %d\n", max, SelfTID);
 
-    bool (*comp)(const uint32_t &, const uint32_t &) = (k < n / 2) ? lessEqualThan : greaterThan; // optimize counting of elements based on the percentile of k
-
     uint32_t p = min - 1;
     uint32_t countSum = 0;
+    uint32_t start = 0, end = arr.size() - 1;
 
     while (true)
     {
         p = p + (max - min + 1) * (k - countSum) / n; // find pivot
-        findLocalCount(local, arr, p, comp, k, n); // find local count
+
+        localSorting(local, arr, start, end, p); // find local count
 
         if (SelfTID != 0) // send local count
             MPI_Send(&local.count, 1, MPI_UINT32_T, 0, 0, MPI_COMM_WORLD);
@@ -189,17 +173,25 @@ void localFn(uint32_t kth, std::vector<uint32_t> &arr, const size_t k, const siz
 
         MPI_Bcast(&countSum, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
 
-        if (checkCond(k, n, countSum)) // if countSum is equal to k, then we have found the kth element
+
+        if (k == countSum || countSum == (k - 1) || countSum == (k + 1)) // if countSum is equal to k, then we have found the kth element
             break;
+        else if (countSum < k)
+        {
+            start = 0;
+            end = local.count;
+        }
         else
-            std::erase_if(arr, [p, k, countSum, comp](uint32_t x)
-                          { return (k - countSum) ? x > p : x < p; });
+        {
+            start = local.count + 1;
+            end = arr.size() - 1;
+        }
     }
 
+    bool (*comp)(const uint32_t &, const uint32_t &); // set comp based on countSum
     setComp(comp, k, n, countSum);
 
-    // find local potential kth element
-    findClosest(kth, arr, p, comp);
+    findClosest(kth, arr, p, comp, k);
 
     if (SelfTID != 0)
         MPI_Send(&kth, 1, MPI_UINT32_T, 0, 0, MPI_COMM_WORLD);
@@ -212,7 +204,7 @@ void localFn(uint32_t kth, std::vector<uint32_t> &arr, const size_t k, const siz
             if (comp(temp, p))
                 kth = comp(kth, temp) ? temp : kth;
         }
-        printf("kth element: %d\n", kth);
+        printf("kth element quick: %d\n", kth);
     }
 
     return;

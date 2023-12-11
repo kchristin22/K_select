@@ -2,8 +2,9 @@
 #include <algorithm>
 #include <mpi.h>
 #include "kSelect.hpp"
+#include "quickSelect.hpp"
 
-#define k 8
+#define k 2
 
 int main()
 {
@@ -21,7 +22,7 @@ int main()
 
     MPI_Comm_size(MPI_COMM_WORLD, &NumTasks);
     MPI_Comm_rank(MPI_COMM_WORLD, &SelfTID);
-    printf("Hello World from % i of % i\n", SelfTID, NumTasks);
+    // printf("Hello World from % i of % i\n", SelfTID, NumTasks);
 
     switch (SelfTID)
     {
@@ -38,6 +39,26 @@ int main()
         localFn(kth, arrs[3], k, 8, NumTasks);
         break;
     }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    switch (SelfTID)
+    {
+    case 0:
+        quickSelect(kth, arrs[0], k, 8, NumTasks);
+        break;
+    case 1:
+        quickSelect(kth, arrs[1], k, 8, NumTasks);
+        break;
+    case 2:
+        quickSelect(kth, arrs[2], k, 8, NumTasks);
+        break;
+    case 3:
+        quickSelect(kth, arrs[3], k, 8, NumTasks);
+        break;
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
 
     MPI_Finalize();
 
