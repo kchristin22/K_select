@@ -3,7 +3,7 @@
 #include <mpi.h>
 #include "kSelect.hpp"
 
-#define k 4
+#define k 8
 
 int main()
 {
@@ -21,7 +21,7 @@ int main()
 
     MPI_Comm_size(MPI_COMM_WORLD, &NumTasks);
     MPI_Comm_rank(MPI_COMM_WORLD, &SelfTID);
-    // printf("Hello World from % i of % i\n", SelfTID, NumTasks);
+    printf("Hello World from % i of % i\n", SelfTID, NumTasks);
 
     switch (SelfTID)
     {

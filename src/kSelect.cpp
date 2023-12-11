@@ -118,7 +118,7 @@ void findClosest(uint32_t &closest, const std::vector<uint32_t> &arr, const uint
     return;
 }
 
-void localFn(uint32_t kth, const std::vector<uint32_t> &arr, const size_t k, const size_t n, const size_t np)
+void localFn(uint32_t kth, std::vector<uint32_t> &arr, const size_t k, const size_t n, const size_t np)
 {
     // find local min
     localData local;
@@ -141,7 +141,7 @@ void localFn(uint32_t kth, const std::vector<uint32_t> &arr, const size_t k, con
                 min = temp;
         }
 
-        // printf("whole min: %d\n", min);
+        printf("whole min: %d\n", min);
     }
 
     MPI_Bcast(&min, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
@@ -158,7 +158,7 @@ void localFn(uint32_t kth, const std::vector<uint32_t> &arr, const size_t k, con
             if (temp > max)
                 max = temp;
         }
-        // printf("whole max: %d\n", max);
+        printf("whole max: %d\n", max);
     }
 
     MPI_Bcast(&max, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
@@ -166,12 +166,13 @@ void localFn(uint32_t kth, const std::vector<uint32_t> &arr, const size_t k, con
 
     bool (*comp)(const uint32_t &, const uint32_t &) = (k < n / 2) ? lessEqualThan : greaterThan; // optimize counting of elements based on the percentile of k
 
-    uint32_t p = min;
+    uint32_t p = min - 1;
     uint32_t countSum = 0;
 
     while (true)
     {
-        p = p + (max - min) * (k - countSum) / n; // find pivot
+        p = p + (max - min + 1) * (k - countSum) / n; // find pivot
+        printf("p: %d, process %d\n", p, SelfTID);
 
         findLocalCount(local, arr, p, comp, k, n); // find local count
 
@@ -192,6 +193,9 @@ void localFn(uint32_t kth, const std::vector<uint32_t> &arr, const size_t k, con
 
         if (checkCond(k, n, countSum)) // if countSum is equal to k, then we have found the kth element
             break;
+        else
+            std::erase_if(arr, [p, k, countSum, comp](uint32_t x)
+                          { return (k - countSum) ? x > p : x < p; });
     }
 
     setComp(comp, k, n, countSum);
