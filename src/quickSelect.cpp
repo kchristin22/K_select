@@ -33,14 +33,12 @@ void quickSelect(uint32_t kth, std::vector<uint32_t> &arr, const size_t k, const
     int master = 0, previous = 0;
 
     MPI_Comm_size(MPI_COMM_WORLD, &NumTasks);
-    printf("NumTasks: %d\n", NumTasks);
     MPI_Comm_rank(MPI_COMM_WORLD, &SelfTID);
 
     MPI_Bcast(&p, 1, MPI_UINT32_T, master, MPI_COMM_WORLD);
 
     while (true)
     {
-        // printf("pivot: %d\n", p);
         localSorting(local, arr, start, end, p);
 
         if (master != SelfTID) // send local count
@@ -74,7 +72,7 @@ void quickSelect(uint32_t kth, std::vector<uint32_t> &arr, const size_t k, const
             start = (local.count == arr.size()) ? end : local.count;
         }
 
-        printf("p: %d, proc: %d, start: %d, end: %d\n", p, SelfTID, start, end);
+        // printf("p: %d, proc: %d, start: %d, end: %d\n", p, SelfTID, start, end);
 
         for (int i = 0; i < NumTasks; i++) // round robin to find the next master, check at most all processes if necessary
         {
@@ -84,32 +82,34 @@ void quickSelect(uint32_t kth, std::vector<uint32_t> &arr, const size_t k, const
                 if (start == end)
                 {                                      // check if I don't have elements in the range of the new pivot
                     master = (SelfTID + 1) % NumTasks; // assign the next process as a master
-                    printf("new master: %d\n", master);
                     previous = SelfTID;
                 }
                 else
                 {
                     // printf("choosing pivot, master: %d\n", master);
-                    previous = SelfTID;
+                    previous = master;
                     p = arr[(rand() % (end - start + 1)) + start]; // new master has passed the test and can choose a new pivot
                     printf("pivot chosen: %d\n", p);
                 }
+                for (int i = 0; i < NumTasks; i++)
+                {
+                    if (i == SelfTID)
+                        continue;
+                    MPI_Send(&master, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
+                    MPI_Send(&previous, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
+                }
             }
-            MPI_Barrier(MPI_COMM_WORLD);
-            // printf("master: %d, previous: %d, proc: %d\n", master, previous, SelfTID);
-            MPI_Bcast(&master, 1, MPI_INT, previous, MPI_COMM_WORLD); // other procs are waiting for the previous to the previous master
-            MPI_Barrier(MPI_COMM_WORLD);
-            MPI_Bcast(&previous, 1, MPI_INT, master, MPI_COMM_WORLD);
-            printf("master: %d, previous: %d, proc: %d\n", master, previous, SelfTID);
-            MPI_Barrier(MPI_COMM_WORLD);
+            else
+            {
+                previous = master;
+                MPI_Recv(&master, 1, MPI_INT, master, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                MPI_Recv(&previous, 1, MPI_INT, previous, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            }
             if (master == previous)
-            { // new master has passed the test
-                // printf("broadcasting pivot: %d\n", p);
-                MPI_Barrier(MPI_COMM_WORLD);
+            {
                 MPI_Bcast(&p, 1, MPI_UINT32_T, master, MPI_COMM_WORLD);
                 break;
             }
-            MPI_Barrier(MPI_COMM_WORLD);
         }
     }
 
