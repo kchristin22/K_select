@@ -34,7 +34,7 @@ inline void setComp(bool (*&comp)(const uint32_t &, const uint32_t &), const siz
     return;
 }
 
-void findLocalMinMax(localDataQuick &local, const std::vector<uint32_t> &arr)
+void findLocalMinMax(localDataHeurQuick &local, const std::vector<uint32_t> &arr)
 {
     uint32_t localmin = arr[0];
 
@@ -70,7 +70,7 @@ void findLocalMinMax(localDataQuick &local, const std::vector<uint32_t> &arr)
     return;
 }
 
-void heurlocalSorting(localDataQuick &local, std::vector<uint32_t> &arr, const uint32_t start, const uint32_t end, const uint32_t p)
+void heurlocalSorting(localDataHeurQuick &local, std::vector<uint32_t> &arr, const uint32_t start, const uint32_t end, const uint32_t p)
 {
     uint32_t i = start, j = end;
     while (true)
@@ -89,6 +89,8 @@ void heurlocalSorting(localDataQuick &local, std::vector<uint32_t> &arr, const u
             break;
     }
     local.count = i;
+
+    return;
 }
 
 void findClosest(uint32_t &closest, const std::vector<uint32_t> &arr, const uint32_t &p, bool (*comp)(const uint32_t &, const uint32_t &), const size_t k)
@@ -110,7 +112,7 @@ void findClosest(uint32_t &closest, const std::vector<uint32_t> &arr, const uint
 void heurQuickSelect(uint32_t kth, std::vector<uint32_t> &arr, const size_t k, const size_t n, const size_t np)
 {
     // find local min
-    localDataQuick local;
+    localDataHeurQuick local;
     findLocalMinMax(local, arr);
 
     uint32_t min = local.localMin, max = local.localMax;
@@ -130,7 +132,7 @@ void heurQuickSelect(uint32_t kth, std::vector<uint32_t> &arr, const size_t k, c
                 min = temp;
         }
 
-        printf("whole min: %d\n", min);
+        // printf("whole min: %d\n", min);
     }
 
     MPI_Bcast(&min, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
@@ -147,7 +149,7 @@ void heurQuickSelect(uint32_t kth, std::vector<uint32_t> &arr, const size_t k, c
             if (temp > max)
                 max = temp;
         }
-        printf("whole max: %d\n", max);
+        // printf("whole max: %d\n", max);
     }
 
     MPI_Bcast(&max, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);

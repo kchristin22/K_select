@@ -5,7 +5,7 @@
 #include <vector>
 #include <stdint.h>
 
-struct localDataQuick
+struct localDataHeurQuick
 {
     uint32_t localMin;
     uint32_t localMax;
@@ -14,9 +14,9 @@ struct localDataQuick
 
 inline void setComp(bool (*&comp)(const uint32_t &, const uint32_t &), const size_t k, const size_t n, const size_t countSum);
 
-void findLocalMinMax(localDataQuick &local, const std::vector<uint32_t> &arr);
+void findLocalMinMax(localDataHeurQuick &local, const std::vector<uint32_t> &arr);
 
-void heurlocalSorting(localDataQuick &local, std::vector<uint32_t> &arr, const uint32_t start, const uint32_t end, const uint32_t p);
+void heurlocalSorting(localDataHeurQuick &local, std::vector<uint32_t> &arr, const uint32_t start, const uint32_t end, const uint32_t p);
 
 void findClosest(uint32_t &closest, const std::vector<uint32_t> &arr, const uint32_t &p, bool (*comp)(const uint32_t &, const uint32_t &));
 

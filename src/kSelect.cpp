@@ -141,7 +141,7 @@ void localFn(uint32_t kth, std::vector<uint32_t> &arr, const size_t k, const siz
                 min = temp;
         }
 
-        printf("whole min: %d\n", min);
+        // printf("whole min: %d\n", min);
     }
 
     MPI_Bcast(&min, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
@@ -158,7 +158,7 @@ void localFn(uint32_t kth, std::vector<uint32_t> &arr, const size_t k, const siz
             if (temp > max)
                 max = temp;
         }
-        printf("whole max: %d\n", max);
+        // printf("whole max: %d\n", max);
     }
 
     MPI_Bcast(&max, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
