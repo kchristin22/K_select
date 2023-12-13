@@ -33,7 +33,7 @@ void quickSelect(uint32_t kth, std::vector<uint32_t> &arr, const size_t k, const
     localDataQuick local;
     uint32_t start = 0, end = arr.size() - 1;
     uint32_t p = arr[(rand() % (end - start + 1)) + start];
-    uint32_t countSum = 0;
+    uint32_t countSum = 0, prevCountSum = 0;
     int NumTasks, SelfTID;
     int master = 0, previous = 0;
 
@@ -50,6 +50,7 @@ void quickSelect(uint32_t kth, std::vector<uint32_t> &arr, const size_t k, const
             MPI_Send(&local.count, 1, MPI_UINT32_T, master, 0, MPI_COMM_WORLD);
         else
         { // gather all local counts
+            prevCountSum = countSum;
             countSum = local.count;
             for (int i = 0; i < NumTasks; i++)
             {
@@ -64,7 +65,7 @@ void quickSelect(uint32_t kth, std::vector<uint32_t> &arr, const size_t k, const
         MPI_Bcast(&countSum, 1, MPI_UINT32_T, master, MPI_COMM_WORLD);
         // printf("countSum: %d\n", countSum);
 
-        if (countSum == k)
+        if (countSum == k || countSum == prevCountSum)
             break;
         else if (countSum > k)
         {
@@ -76,7 +77,6 @@ void quickSelect(uint32_t kth, std::vector<uint32_t> &arr, const size_t k, const
             end = arr.size() - 1;
             start = local.count;
         }
-
 
         for (int i = 0; i < NumTasks; i++) // round robin to find the next master, check at most all processes if necessary
         {

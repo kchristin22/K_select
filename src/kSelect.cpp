@@ -164,6 +164,13 @@ void localFn(uint32_t kth, std::vector<uint32_t> &arr, const size_t k, const siz
     MPI_Bcast(&max, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
     // printf("whole max %d, process %d\n", max, SelfTID);
 
+    if (min == max)
+    {
+        kth = min;
+        printf("kth element: %d\n", kth);
+        return;
+    }
+
     bool (*comp)(const uint32_t &, const uint32_t &) = (k < n / 2) ? lessEqualThan : greaterThan; // optimize counting of elements based on the percentile of k
 
     uint32_t p = min - 1;
@@ -171,8 +178,8 @@ void localFn(uint32_t kth, std::vector<uint32_t> &arr, const size_t k, const siz
 
     while (true)
     {
-        p = p + (max - min + 1) * (k - countSum) / n; // find pivot
-        findLocalCount(local, arr, p, comp, k, n); // find local count
+        p += ((max - min + 1) * (k - countSum)) > 0 ? ((max - min + 1) * (k - countSum)) / n : 0; // find pivot
+        findLocalCount(local, arr, p, comp, k, n);                                                // find local count
 
         if (SelfTID != 0) // send local count
             MPI_Send(&local.count, 1, MPI_UINT32_T, 0, 0, MPI_COMM_WORLD);
