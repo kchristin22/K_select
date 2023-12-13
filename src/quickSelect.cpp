@@ -5,6 +5,11 @@
 void localSorting(localDataQuick &local, std::vector<uint32_t> &arr, const uint32_t start, const uint32_t end, const uint32_t p)
 {
     uint32_t i = start, j = end;
+    if (i > j)
+    {
+        local.count = i;
+        return;
+    }
 
     while (true)
     {
@@ -19,7 +24,7 @@ void localSorting(localDataQuick &local, std::vector<uint32_t> &arr, const uint3
             break;
     }
 
-    local.count = (arr[i] <= p) ? i + 1 - start : i - start; // i and j equal
+    local.count = (arr[i] <= p) ? i + 1 : i; // i and j equal
     return;
 }
 
@@ -64,32 +69,29 @@ void quickSelect(uint32_t kth, std::vector<uint32_t> &arr, const size_t k, const
         else if (countSum > k)
         {
             start = 0;
-            end = local.count; // check if -1 is needed, but then we have to check for the case where local.count == 0
+            end = (local.count > 0) ? local.count - 1 : local.count; // check if -1 is needed, but then we have to check for the case where local.count == 0
         }
         else // we already know that countSum != k-1
         {
             end = arr.size() - 1;
-            start = (local.count == arr.size()) ? end : local.count;
+            start = local.count;
         }
 
-        // printf("p: %d, proc: %d, start: %d, end: %d\n", p, SelfTID, start, end);
 
         for (int i = 0; i < NumTasks; i++) // round robin to find the next master, check at most all processes if necessary
         {
             if (master == SelfTID)
             {
-                // printf("master, start, end: %d %d %d\n", master, start, end);
-                if (start == end)
+                if (start > end)
                 {                                      // check if I don't have elements in the range of the new pivot
                     master = (SelfTID + 1) % NumTasks; // assign the next process as a master
                     previous = SelfTID;
                 }
                 else
                 {
-                    // printf("choosing pivot, master: %d\n", master);
                     previous = master;
                     p = arr[(rand() % (end - start + 1)) + start]; // new master has passed the test and can choose a new pivot
-                    printf("pivot chosen: %d\n", p);
+                    // printf("pivot chosen: %d\n", p);
                 }
                 for (int i = 0; i < NumTasks; i++)
                 {
