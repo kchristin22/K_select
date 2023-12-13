@@ -93,7 +93,7 @@ void heurlocalSorting(localDataHeurQuick &local, std::vector<uint32_t> &arr, con
     return;
 }
 
-void findClosest(uint32_t &closest, const std::vector<uint32_t> &arr, const uint32_t &p, bool (*comp)(const uint32_t &, const uint32_t &))
+void heurfindClosest(uint32_t &closest, const std::vector<uint32_t> &arr, const uint32_t &p, bool (*comp)(const uint32_t &, const uint32_t &))
 { // check for custom reduction with template functions
     closest = arr[0];
 #pragma omp parallel for
@@ -168,7 +168,7 @@ void heurQuickSelect(uint32_t kth, std::vector<uint32_t> &arr, const size_t k, c
 
     while (true)
     {
-        p += ((max - min + 1) * (k - countSum)) > 0 ? ((max - min + 1) * (k - countSum)) / n : 0; // find pivot
+        p = (p + ((max - min + 1) * (k - countSum)) / n) > 0 ? p + ((max - min + 1) * (k - countSum)) / n : min; // find pivot
 
         heurlocalSorting(local, arr, start, end, p); // find local count
 
@@ -204,7 +204,7 @@ void heurQuickSelect(uint32_t kth, std::vector<uint32_t> &arr, const size_t k, c
     bool (*comp)(const uint32_t &, const uint32_t &); // set comp based on countSum
     setComp(comp, k, n, countSum);
 
-    findClosest(kth, arr, p, comp);
+    heurfindClosest(kth, arr, p, comp);
 
     if (SelfTID != 0)
         MPI_Send(&kth, 1, MPI_UINT32_T, 0, 0, MPI_COMM_WORLD);

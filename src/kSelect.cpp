@@ -178,8 +178,8 @@ void localFn(uint32_t kth, std::vector<uint32_t> &arr, const size_t k, const siz
 
     while (true)
     {
-        p += ((max - min + 1) * (k - countSum)) > 0 ? ((max - min + 1) * (k - countSum)) / n : 0; // find pivot
-        findLocalCount(local, arr, p, comp, k, n);                                                // find local count
+        p = (p + ((max - min + 1) * (k - countSum)) / n) > 0 ? p + ((max - min + 1) * (k - countSum)) / n : min; // find pivot
+        findLocalCount(local, arr, p, comp, k, n); // find local count
 
         if (SelfTID != 0) // send local count
             MPI_Send(&local.count, 1, MPI_UINT32_T, 0, 0, MPI_COMM_WORLD);

@@ -5,7 +5,7 @@
 #include "heurQuickSelect.hpp"
 #include "quickSelect.hpp"
 
-#define k 1
+#define k 8
 
 int main()
 {
