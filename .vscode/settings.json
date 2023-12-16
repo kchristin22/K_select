@@ -1,6 +1,6 @@
 {
   "cmake.debugConfig": {
-    "args": []
+    "args": ["-np", "4"]
   },
   "files.associations": {
     "array": "cpp",

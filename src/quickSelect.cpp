@@ -28,7 +28,7 @@ void localSorting(localDataQuick &local, std::vector<uint32_t> &arr, const uint3
     return;
 }
 
-void quickSelect(uint32_t kth, std::vector<uint32_t> &arr, const size_t k, const size_t n, const size_t np)
+void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, const size_t n, const size_t np)
 {
     localDataQuick local;
     uint32_t start = 0, end = arr.size() - 1;
@@ -70,7 +70,7 @@ void quickSelect(uint32_t kth, std::vector<uint32_t> &arr, const size_t k, const
         else if (countSum > k)
         {
             start = 0;
-            end = (local.count > 0) ? local.count - 1 : local.count; // check if -1 is needed, but then we have to check for the case where local.count == 0
+            end = local.count; // check if -1 is needed, but then we have to check for the case where local.count == 0
         }
         else // we already know that countSum != k-1
         {
