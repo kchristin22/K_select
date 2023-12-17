@@ -5,16 +5,26 @@
 #include "heurQuickSelect.hpp"
 #include "quickSelect.hpp"
 
-#define k 8
+#define k_default 4
 
-int main()
+int main(int argc, char **argv)
 {
+    int k;
+    if (argc == 2)
+        k = atoi(argv[1]);
+    else
+        k = k_default;
+
     std::vector<uint32_t> arr(8);
     srand(time(NULL));
     printf("arr: ");
-    // arr = {8, 8, 8, 9, 9, 8, 2, 4};
+    arr = {8, 8, 8, 9, 9, 8, 2, 4};
     // arr = {4, 4, 4, 2, 1, 2, 3, 2};
-    arr = {1, 2, 3, 4, 5, 6, 7, 8};
+    // arr = {1, 2, 3, 4, 5, 6, 7, 8};
+    // arr = {3, 1, 4, 2, 6, 10, 10, 9};
+    // arr = {10, 10, 3, 10, 10, 7, 5, 6};
+    // arr = {4, 1, 1, 4, 2, 5, 8, 4};
+    // arr = {4, 3, 5, 5, 5, 4, 1, 1};
 
     for (uint32_t i = 0; i < 8; i++)
     {
@@ -41,7 +51,20 @@ int main()
     {
     case 0:
         kSearch(kth, arrs[0], k, 8, NumTasks);
-        printf("kth element: %d\n", kth);
+        switch(k){
+            case 1:
+                printf("1st element: %d\n", kth);
+                break;
+            case 2:
+                printf("2nd element: %d\n", kth);
+                break;
+            case 3:
+                printf("3rd element: %d\n", kth);
+                break;
+            default:
+                printf("%dth element: %d\n", k, kth);
+                break;
+        }
         break;
     case 1:
         kSearch(kth, arrs[1], k, 8, NumTasks);

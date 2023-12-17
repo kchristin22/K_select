@@ -22,36 +22,9 @@ inline bool greaterThan(const uint32_t &a, const uint32_t &b)
     return a > b;
 }
 
-// inline bool checkCond(const size_t k, const size_t n, const uint32_t countSum)
-// {
-//     if (k < n / 2)
-//         return ((countSum == k) || (countSum == (k - 1))) ? true : false;
-//     else
-//         return ((countSum == (n - k)) || (countSum == (n - k + 1))) ? true : false;
-// }
-
-// inline void setComp(bool (*&comp)(const uint32_t &, const uint32_t &), const size_t k, const size_t n, const size_t countSum)
-// {
-//     if (k < n / 2)
-//     {
-//         if ((countSum >= k))
-//             comp = lessEqualThan; // the next element less than or equal to the pivot is the kth element
-//         else if (countSum <= (k - 1))
-//             comp = greaterThan; // the next element bigger than the pivot is the kth element
-//     }
-//     else
-//     {
-//         if (countSum == (n - k))
-//             comp = lessEqualThan; // the next element less than or equal to the pivot is the kth element
-//         else if (countSum == (n - k + 1))
-//             comp = greaterThan; // the next element bigger than the pivot is the kth element
-//     }
-
-//     return;
-// }
-
 void findLocalMinMax(localData &local, const std::vector<uint32_t> &arr)
 {
+    // find local min
     uint32_t localmin = arr[0];
 
 #pragma omp parallel for reduction(min : localmin)
@@ -64,8 +37,6 @@ void findLocalMinMax(localData &local, const std::vector<uint32_t> &arr)
     }
 
     local.localMin = localmin;
-
-    // printf("local min: %d\n", local.localMin);
 
     // find local max
     uint32_t localmax = arr[0];
@@ -81,8 +52,6 @@ void findLocalMinMax(localData &local, const std::vector<uint32_t> &arr)
 
     local.localMax = localmax;
 
-    // printf("localMax: %d\n", local.localMax);
-
     return;
 }
 
@@ -90,22 +59,24 @@ inline void findLocalCount(localData &local, const std::vector<uint32_t> &arr, c
 {
     uint32_t count = 0;
 
-    // check conditions of pivot being out of local range, where we can instantly know the value of count
-    if (((k < n / 2) && (p < local.localMin)) || ((k >= n / 2) && (p > local.localMax))) // if pivot is less than local min, when we count the less than / greater than local max, when we count the greater than
-        count = 0;                                                                       // no elements are less than the pivot / greater than the pivot
-    else if (((k < n / 2) && (p >= local.localMax)) || ((k >= n / 2) && (p < local.localMin)))
-        count = arr.size();
+    if (p < local.localMin)
+        local.count = 0; // no elements are less than or equal to the pivot
+    else if (p > local.localMax)
+        local.count = arr.size(); // all elements are less than or equal to the pivot
     else
     {
 #pragma omp parallel for reduction(+ : count)
-        for (size_t i = 0; i < arr.size(); i++) // count elements less than or greater than pivot, depending on the percentile of k
+        for (size_t i = 0; i < arr.size(); i++) // count elements less than or eqaul to the pivot
         {
             if (comp(arr[i], p))
                 count++;
         }
-    }
 
-    local.count = count;
+        if (k >= n / 2)
+            count = arr.size() - count; // save the less than or equal to the pivot
+
+        local.count = count;
+    }
 
     return;
 }
@@ -126,126 +97,8 @@ void findClosest(int &closest, const std::vector<uint32_t> &arr, const int &p, b
     return;
 }
 
-void localFnLessEqual(int &kth, int &p, uint32_t &countSum, int prevP, uint32_t prevCountSum, localData local, std::vector<uint32_t> &arr, const uint32_t min, const uint32_t max, const size_t k, const size_t n, const size_t np)
-{
-    int SelfTID;
-    MPI_Comm_rank(MPI_COMM_WORLD, &SelfTID);
-
-    kth = 0;
-    int newP;
-    while (true) // break this in two while loops, based on k position
-    {
-
-        if (countSum == prevCountSum)
-            countSum = k > countSum ? countSum + 1 : countSum - 1;
-
-        newP = p + ((k - countSum) * (prevP - p)) / (prevCountSum - countSum); // find pivot
-        if (newP < (int)min)
-            newP = min;
-        else if (newP > (int)max)
-            newP = max;
-        else if (newP == p)
-            newP = (k > countSum) ? p++ : p--;
-
-        prevP = p;
-        p = newP;
-        prevCountSum = countSum;
-
-        findLocalCount(local, arr, p, lessEqualThan, k, n); // find local count
-
-        if (SelfTID != 0) // send local count
-            MPI_Send(&local.count, 1, MPI_UINT32_T, 0, 0, MPI_COMM_WORLD);
-        else
-        { // gather all local counts
-            countSum = local.count;
-            for (size_t i = 1; i < np; i++)
-            {
-                uint32_t temp;
-                MPI_Recv(&temp, 1, MPI_UINT32_T, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                countSum += temp;
-            }
-        }
-
-        MPI_Bcast(&countSum, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
-
-        if (abs(prevP - p) == 1)
-        {
-            if (lessEqualThan(prevCountSum, countSum) && k > prevCountSum && k < countSum) // pivots with distance =1 and k belongs in the range of their count sums
-            {
-                kth = p; // pivot with largest count of the two (and thus largest pivot value) is in the array and is the kth element
-                return;
-            }
-        }
-
-        if ((countSum == k) || (countSum == (k - 1))) // if countSum is equal to k, then we have found the kth element
-            return;
-        // else
-        //     std::erase_if(arr, [p, k, countSum, comp](uint32_t x)
-        //                   { return (k - countSum) > 0 ? x < p : x > p; });
-    }
-}
-
-void localFnGreater(int &kth, int &p, uint32_t &countSum, int prevP, uint32_t prevCountSum, localData local, std::vector<uint32_t> &arr, const uint32_t min, const uint32_t max, const size_t k, const size_t n, const size_t np)
-{
-    int SelfTID;
-    MPI_Comm_rank(MPI_COMM_WORLD, &SelfTID);
-
-    kth = 0;
-    int newP;
-    while (true) // break this in two while loops, based on k position
-    {
-        if (countSum == prevCountSum)
-            countSum = k > (n - countSum) ? countSum + 1 : countSum - 1;
-
-        newP = p + ((k - (n - countSum)) * (prevP - p)) / ((n - prevCountSum) - (n - countSum)); // find pivot
-        if (newP < (int)min)
-            newP = min;
-        else if (newP > (int)max)
-            newP = max;
-        else if (newP == p)
-            newP = (k > (n - countSum)) ? p + 1 : p - 1;
-
-        prevP = p;
-        p = newP;
-        prevCountSum = countSum;
-
-        findLocalCount(local, arr, p, greaterThan, k, n); // find local count
-
-        if (SelfTID != 0) // send local count
-            MPI_Send(&local.count, 1, MPI_UINT32_T, 0, 0, MPI_COMM_WORLD);
-        else
-        { // gather all local counts
-            countSum = local.count;
-            for (size_t i = 1; i < np; i++)
-            {
-                uint32_t temp;
-                MPI_Recv(&temp, 1, MPI_UINT32_T, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                countSum += temp;
-            }
-        }
-
-        MPI_Bcast(&countSum, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
-
-        if (abs(prevP - p) == 1)
-        {
-            if (greaterThan(prevCountSum, countSum) && k > (n - prevCountSum) && k < (n - countSum))
-            {
-                kth = p; // pivot with the smallest count of the two (and thus the largest pivot value) is in the array and is the kth element
-                return;
-            }
-        }
-
-        if ((countSum == (n - k)) || (countSum == (n - k + 1))) // if countSum is equal to k, then we have found the kth element
-            return;
-        // else
-        //     std::erase_if(arr, [p, k, countSum, comp, n](uint32_t x)
-        //                   { return (k - (n - countSum)) > 0 ? x < p : x > p; });
-    }
-}
-
 void kSearch(int &kth, std::vector<uint32_t> &arr, const size_t k, const size_t n, const size_t np)
 {
-    // find local min
     localData local;
     findLocalMinMax(local, arr);
 
@@ -265,12 +118,9 @@ void kSearch(int &kth, std::vector<uint32_t> &arr, const size_t k, const size_t 
             if (temp < min)
                 min = temp;
         }
-
-        // printf("whole min: %d\n", min);
     }
 
     MPI_Bcast(&min, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
-    // printf("whole min %d, process %d\n", min, SelfTID);
 
     if (SelfTID != 0) // send local min and max
         MPI_Send(&max, 1, MPI_UINT32_T, 0, 0, MPI_COMM_WORLD);
@@ -283,51 +133,98 @@ void kSearch(int &kth, std::vector<uint32_t> &arr, const size_t k, const size_t 
             if (temp > max)
                 max = temp;
         }
-        // printf("whole max: %d\n", max);
     }
 
     MPI_Bcast(&max, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
-    // printf("whole max %d, process %d\n", max, SelfTID);
 
     if (min == max)
     {
         kth = min;
         return;
     }
+    else if (k == 1)
+    {
+        kth = min;
+        return;
+    }
+    else if (k == n)
+    {
+        kth = max;
+        return;
+    }
 
     int p = min, prevP = max;
-    uint32_t countSum, prevCountSum;
-    bool (*comp)(const uint32_t &, const uint32_t &);
+    int newP;
+    uint32_t countSumLess = 0, prevCountSumLess = n;
+    bool (*comp)(const uint32_t &, const uint32_t &) = (k < n / 2) ? lessEqualThan : greaterThan;
 
-    if (k < n / 2)
+    while (true)
     {
-        countSum = 0;
-        prevCountSum = n;
-        comp = lessEqualThan;                                                                    // optimize counting of elements based on the percentile of k
-        localFnLessEqual(kth, p, countSum, prevP, prevCountSum, local, arr, min, max, k, n, np); // consider making p and countsum a struct
 
-        if ((countSum >= k))
-            comp = lessEqualThan; // the next element less than or equal to the pivot is the kth element
-        else if (countSum <= (k - 1))
-            comp = greaterThan; // the next element bigger than the pivot is the kth element
+        findLocalCount(local, arr, p, comp, k, n); // find local count
+
+        if (SelfTID != 0) // send local count
+            MPI_Send(&local.count, 1, MPI_UINT32_T, 0, 0, MPI_COMM_WORLD);
+        else
+        { // gather all local counts
+            countSumLess = local.count;
+            for (size_t i = 1; i < np; i++)
+            {
+                uint32_t temp;
+                MPI_Recv(&temp, 1, MPI_UINT32_T, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                countSumLess += temp;
+            }
+        }
+
+        MPI_Bcast(&countSumLess, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
+
+        if (abs(prevP - p) == 1)
+        {
+            // if (!(prevP == (int)min && prevCountSumLess == 0))
+            // { // initialization of countSumLess is not correct
+
+            if (lessThan(prevCountSumLess, countSumLess) && k > prevCountSumLess && k < countSumLess)
+            {
+                kth = p; // pivot with the greatest count of the two (and thus the largest pivot value) is in the array and is the kth element
+                return;
+            }
+            // else if (greaterThan(prevCountSumLess, countSumLess) && k < prevCountSumLess && k > countSumLess)
+            // {
+            //     kth = prevP; // pivot with the greatest count of the two (and thus the largest pivot value) is in the array and is the kth element
+            //     return;
+            // }
+            // }
+        }
+
+        if ((countSumLess == k) || (countSumLess == (k - 1))) // if countSum is equal to k, then we have found the kth element
+            break;
+        // else
+        //     std::erase_if(arr, [p, k, countSumLess, comp](uint32_t x)
+        //                   { return (k - countSumLess) > 0 ? x < p : x > p; }); // check if arr size changes
+
+        if (countSumLess == prevCountSumLess)
+            countSumLess = (k > countSumLess && prevP > p) ? countSumLess - 1 : countSumLess + 1; // change countSum instead of prevCountSum to balance
+                                                                                                  // the numerator and denominator of the pivot formula
+                                                                                                  // cannot harm the algorithm, since the relationship of countSum and k will not change
+                                                                                                  // (whichever is bigger will remain bigger)
+
+        newP = p + ((k - countSumLess) * (prevP - p)) / (prevCountSumLess - countSumLess); // find pivot
+        if (newP < (int)min)
+            newP = min;
+        else if (newP > (int)max)
+            newP = max;
+        else if (newP == p)
+            newP = (k > countSumLess) ? p + 1 : p - 1;
+
+        prevP = p;
+        p = newP;
+        prevCountSumLess = countSumLess;
     }
-    else
-    {
-        countSum = n;
-        prevCountSum = 0;
-        comp = greaterEqualThan;
-        localFnGreater(kth, p, countSum, prevP, prevCountSum, local, arr, min, max, k, n, np);
 
-        if (countSum == (n - k))
-            comp = lessEqualThan; // the next element less than or equal to the pivot is the kth element
-        else if (countSum == (n - k + 1))
-            comp = greaterThan; // the next element bigger than the pivot is the kth element
-    }
-
-    if (kth == p)
-        return;
-
-    // setComp(comp, k, n, countSum);
+    if ((countSumLess == k))
+        comp = lessEqualThan; // the next element less than or equal to the pivot is the kth element
+    else if (countSumLess == (k - 1))
+        comp = greaterThan; // the next element bigger than the pivot is the kth element
 
     // find local potential kth element
     findClosest(kth, arr, p, comp);
