@@ -36,6 +36,7 @@ inline void setComp(bool (*&comp)(const uint32_t &, const uint32_t &), const siz
 
 void findLocalMinMax(localDataHeurQuick &local, const std::vector<uint32_t> &arr)
 {
+    // find local min
     uint32_t localmin = arr[0];
 
 #pragma omp parallel for reduction(min : localmin)
@@ -48,8 +49,6 @@ void findLocalMinMax(localDataHeurQuick &local, const std::vector<uint32_t> &arr
     }
 
     local.localMin = localmin;
-
-    // printf("local min: %d\n", local.localMin);
 
     // find local max
     uint32_t localmax = arr[0];
@@ -65,8 +64,6 @@ void findLocalMinMax(localDataHeurQuick &local, const std::vector<uint32_t> &arr
 
     local.localMax = localmax;
 
-    // printf("localMax: %d\n", local.localMax);
-
     return;
 }
 
@@ -78,25 +75,26 @@ void heurlocalSorting(localDataHeurQuick &local, std::vector<uint32_t> &arr, con
         local.count = i;
         return;
     }
+    else if (j == arr.size())
+        j--;
 
     while (true)
     {
-        while ((arr[i] <= p) && i < j)
-            i++;
+        while ((arr[i] <= p) && i <= j)
+            i++; // the count
         while ((arr[j] > p) && i < j)
             j--;
         if (i < j)
             std::swap(arr[i], arr[j]);
-
-        if (i == j || i == (j - 1))
+        else
             break;
     }
 
-    local.count = (arr[i] <= p) ? i + 1 : i; // i and j equal
+    local.count = i; // i and j equal
     return;
 }
 
-void heurfindClosest(uint32_t &closest, const std::vector<uint32_t> &arr, const uint32_t &p, bool (*comp)(const uint32_t &, const uint32_t &))
+void heurfindClosest(int &closest, const std::vector<uint32_t> &arr, const uint32_t &p, bool (*comp)(const uint32_t &, const uint32_t &))
 { // check for custom reduction with template functions
     closest = arr[0];
 #pragma omp parallel for
@@ -112,9 +110,8 @@ void heurfindClosest(uint32_t &closest, const std::vector<uint32_t> &arr, const 
     return;
 }
 
-void heurQuickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, const size_t n, const size_t np)
+void heurQuickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const size_t n, const size_t np)
 {
-    // find local min
     localDataHeurQuick local;
     findLocalMinMax(local, arr);
 
@@ -134,8 +131,6 @@ void heurQuickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, 
             if (temp < min)
                 min = temp;
         }
-
-        // printf("whole min: %d\n", min);
     }
 
     MPI_Bcast(&min, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
@@ -151,7 +146,6 @@ void heurQuickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, 
             if (temp > max)
                 max = temp;
         }
-        // printf("whole max: %d\n", max);
     }
 
     MPI_Bcast(&max, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
@@ -161,15 +155,25 @@ void heurQuickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, 
         kth = min;
         return;
     }
+    else if (k == 1)
+    {
+        kth = min;
+        return;
+    }
+    else if (k == n)
+    {
+        kth = max;
+        return;
+    }
 
-    uint32_t p = min;
-    uint32_t countSum = 0;
+    int p = min, prevP = max;
+    int newP;
+    uint32_t countSum = 0, prevCountSum = n;
     uint32_t start = 0, end = arr.size() - 1;
 
     while (true)
     {
-        p = p + (((k - countSum) * (max - min)) / n) > 0 ? p + (((k - countSum) * (max - min)) / n) : min; // find pivot
-        heurlocalSorting(local, arr, start, end, p);                                                       // find local count
+        heurlocalSorting(local, arr, start, end, p); // find local count
 
         if (SelfTID != 0) // send local count
             MPI_Send(&local.count, 1, MPI_UINT32_T, 0, 0, MPI_COMM_WORLD);
@@ -186,6 +190,15 @@ void heurQuickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, 
 
         MPI_Bcast(&countSum, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
 
+        if (abs(prevP - p) == 1)
+        {
+            if (lessThan(prevCountSum, countSum) && k > prevCountSum && k < countSum)
+            {
+                kth = p; // pivot with the greatest count of the two (and thus the largest pivot value) is in the array and is the kth element
+                return;
+            }
+        }
+
         if (k == countSum || countSum == (k - 1)) // if countSum is equal to k, then we have found the kth element
             break;
         else if (countSum > k)
@@ -198,6 +211,21 @@ void heurQuickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, 
             start = local.count;
             end = arr.size() - 1;
         }
+
+        if (countSum == prevCountSum)
+            countSum = (k > countSum && prevP > p) ? countSum - 1 : countSum + 1;
+
+        newP = p + ((k - countSum) * (prevP - p)) / (prevCountSum - countSum); // find pivot
+        if (newP < (int)min)
+            newP = min;
+        else if (newP > (int)max)
+            newP = max;
+        else if (newP == p)
+            newP = (k > countSum) ? p + 1 : p - 1;
+
+        prevP = p;
+        p = newP;
+        prevCountSum = countSum;
     }
 
     bool (*comp)(const uint32_t &, const uint32_t &); // set comp based on countSum

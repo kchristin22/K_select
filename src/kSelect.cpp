@@ -7,11 +7,6 @@ inline bool lessEqualThan(const uint32_t &a, const uint32_t &b)
     return a <= b; // count the elements that are equal to the pivot as well, to avoid infinite loop
 }
 
-inline bool greaterEqualThan(const uint32_t &a, const uint32_t &b)
-{
-    return a >= b;
-}
-
 inline bool lessThan(const uint32_t &a, const uint32_t &b)
 {
     return a < b;
@@ -180,7 +175,7 @@ void kSearch(int &kth, std::vector<uint32_t> &arr, const size_t k, const size_t 
 
         if (abs(prevP - p) == 1)
         {
-            // if (!(prevP == (int)min && prevCountSumLess == 0))
+            // if (!(prevP == (int)min && prevCountSumLess == 0)) // this is to be used if we assign the mean value to the pivot first, instead of the min
             // { // initialization of countSumLess is not correct
 
             if (lessThan(prevCountSumLess, countSumLess) && k > prevCountSumLess && k < countSumLess)
@@ -188,11 +183,6 @@ void kSearch(int &kth, std::vector<uint32_t> &arr, const size_t k, const size_t 
                 kth = p; // pivot with the greatest count of the two (and thus the largest pivot value) is in the array and is the kth element
                 return;
             }
-            // else if (greaterThan(prevCountSumLess, countSumLess) && k < prevCountSumLess && k > countSumLess)
-            // {
-            //     kth = prevP; // pivot with the greatest count of the two (and thus the largest pivot value) is in the array and is the kth element
-            //     return;
-            // }
             // }
         }
 

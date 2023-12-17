@@ -18,17 +18,18 @@ int main(int argc, char **argv)
     std::vector<uint32_t> arr(8);
     srand(time(NULL));
     printf("arr: ");
-    arr = {8, 8, 8, 9, 9, 8, 2, 4};
+    // arr = {8, 8, 8, 9, 9, 8, 2, 4};
     // arr = {4, 4, 4, 2, 1, 2, 3, 2};
     // arr = {1, 2, 3, 4, 5, 6, 7, 8};
     // arr = {3, 1, 4, 2, 6, 10, 10, 9};
     // arr = {10, 10, 3, 10, 10, 7, 5, 6};
     // arr = {4, 1, 1, 4, 2, 5, 8, 4};
     // arr = {4, 3, 5, 5, 5, 4, 1, 1};
+    // arr = {3, 10, 1, 10, 3, 7, 3, 9};
 
     for (uint32_t i = 0; i < 8; i++)
     {
-        // arr[i] = rand() % 10 + 1;
+        arr[i] = rand() % 10 + 1;
         printf("%d, ", arr[i]);
     }
     printf("\n");
@@ -79,24 +80,24 @@ int main(int argc, char **argv)
 
     MPI_Barrier(MPI_COMM_WORLD);
 
-    // switch (SelfTID)
-    // {
-    // case 0:
-    //     heurQuickSelect(kth, arrs[0], k, 8, NumTasks);
-    //     printf("kth element heur: %d\n", kth);
-    //     break;
-    // case 1:
-    //     heurQuickSelect(kth, arrs[1], k, 8, NumTasks);
-    //     break;
-    // case 2:
-    //     heurQuickSelect(kth, arrs[2], k, 8, NumTasks);
-    //     break;
-    // case 3:
-    //     heurQuickSelect(kth, arrs[3], k, 8, NumTasks);
-    //     break;
-    // }
+    switch (SelfTID)
+    {
+    case 0:
+        heurQuickSelect(kth, arrs[0], k, 8, NumTasks);
+        printf("kth element heur: %d\n", kth);
+        break;
+    case 1:
+        heurQuickSelect(kth, arrs[1], k, 8, NumTasks);
+        break;
+    case 2:
+        heurQuickSelect(kth, arrs[2], k, 8, NumTasks);
+        break;
+    case 3:
+        heurQuickSelect(kth, arrs[3], k, 8, NumTasks);
+        break;
+    }
 
-    // MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);
 
     // switch (SelfTID)
     // {
