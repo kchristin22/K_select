@@ -16,6 +16,11 @@ int main(int argc, char **argv)
         k = k_default;
 
     std::vector<uint32_t> arr(8);
+    if (k > (int)arr.size())
+    {
+        printf("k is out pt array range\n");
+        return 0;
+    }
     srand(time(NULL));
     printf("arr: ");
     // arr = {8, 8, 8, 9, 9, 8, 2, 4};
@@ -37,10 +42,6 @@ int main(int argc, char **argv)
     printf("\n");
 
     std::vector<std::vector<uint32_t>> arrs(4, std::vector<uint32_t>(2));
-    for (uint32_t i = 0; i < 8; i += 2) // change this
-    {
-        std::copy(arr.begin() + i, arr.begin() + i + 2, arrs[i / 2].begin()); // change this    
-    }
 
     int NumTasks, SelfTID;
     int kth = 0;
@@ -51,88 +52,48 @@ int main(int argc, char **argv)
     MPI_Comm_size(MPI_COMM_WORLD, &NumTasks);
     MPI_Comm_rank(MPI_COMM_WORLD, &SelfTID);
 
-    switch (SelfTID)
+    MPI_Scatter(arr.data(), 2, MPI_UINT32_T, arrs[SelfTID].data(), 2, MPI_UINT32_T, 0, MPI_COMM_WORLD);
+
+    kSearch(kth, arrs[SelfTID], k, arr.size(), NumTasks);
+
+    if (SelfTID == 0)
     {
-    case 0:
-        kSearch(kth, arrs[0], k, 8, NumTasks);
-        switch(k){
-            case 1:
-                printf("1st element: %d\n", kth);
-                break;
-            case 2:
-                printf("2nd element: %d\n", kth);
-                break;
-            case 3:
-                printf("3rd element: %d\n", kth);
-                break;
-            default:
-                printf("%dth element: %d\n", k, kth);
-                break;
+        switch (k)
+        {
+        case 1:
+            printf("1st element: %d\n", kth);
+            break;
+        case 2:
+            printf("2nd element: %d\n", kth);
+            break;
+        case 3:
+            printf("3rd element: %d\n", kth);
+            break;
+        default:
+            printf("%dth element: %d\n", k, kth);
+            break;
         }
-        break;
-    case 1:
-        kSearch(kth, arrs[1], k, 8, NumTasks);
-        break;
-    case 2:
-        kSearch(kth, arrs[2], k, 8, NumTasks);
-        break;
-    case 3:
-        kSearch(kth, arrs[3], k, 8, NumTasks);
-        break;
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
 
-    for (uint32_t i = 0; i < 8; i += 2) // change this
-    {
-        std::copy(arr.begin() + i, arr.begin() + i + 2, arrs[i / 2].begin()); // change this
-    }
+    MPI_Scatter(arr.data(), 2, MPI_UINT32_T, arrs[SelfTID].data(), 2, MPI_UINT32_T, 0, MPI_COMM_WORLD);
 
-    switch (SelfTID)
-    {
-    case 0:
-        heurQuickSelect(kth, arrs[0], k, 8, NumTasks);
+    heurQuickSelect(kth, arrs[SelfTID], k, arr.size(), NumTasks);
+
+    if (SelfTID == 0)
         printf("kth element heur: %d\n", kth);
-        break;
-    case 1:
-        heurQuickSelect(kth, arrs[1], k, 8, NumTasks);
-        break;
-    case 2:
-        heurQuickSelect(kth, arrs[2], k, 8, NumTasks);
-        break;
-    case 3:
-        heurQuickSelect(kth, arrs[3], k, 8, NumTasks);
-        break;
-    }
 
     MPI_Barrier(MPI_COMM_WORLD);
 
-    for (uint32_t i = 0; i < 8; i += 2) // change this
-    {
-        std::copy(arr.begin() + i, arr.begin() + i + 2, arrs[i / 2].begin()); // change this
-    }
+    quickSelect(kth, arrs[SelfTID], k, arr.size(), NumTasks);
 
-    switch (SelfTID)
-    {
-    case 0:
-        quickSelect(kth, arrs[0], k, 8, NumTasks);
+    if (SelfTID == 0)
         printf("kth element quick: %d\n", kth);
-        break;
-    case 1:
-        quickSelect(kth, arrs[1], k, 8, NumTasks);
-        break;
-    case 2:
-        quickSelect(kth, arrs[2], k, 8, NumTasks);
-        break;
-    case 3:
-        quickSelect(kth, arrs[3], k, 8, NumTasks);
-        break;
-    }
 
     MPI_Barrier(MPI_COMM_WORLD);
 
     MPI_Finalize();
 
-    // printf("Hello World from % i\n", SelfTID);
     return 0;
 }
