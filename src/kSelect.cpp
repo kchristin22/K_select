@@ -178,12 +178,18 @@ void kSearch(int &kth, std::vector<uint32_t> &arr, const size_t k, const size_t 
             // if (!(prevP == (int)min && prevCountSumLess == 0)) // this is to be used if we assign the mean value to the pivot first, instead of the min
             // { // initialization of countSumLess is not correct
 
-            if (lessThan(prevCountSumLess, countSumLess) && k > prevCountSumLess && k < countSumLess)
+            if (prevCountSumLess < countSumLess && k > prevCountSumLess && k < countSumLess)
             {
                 kth = p; // pivot with the greatest count of the two (and thus the largest pivot value) is in the array and is the kth element
                 return;
             }
             // }
+
+            else if (prevCountSumLess > countSumLess && k < prevCountSumLess && k > countSumLess)
+            {
+                kth = prevP;
+                return;
+            }
         }
 
         if ((countSumLess == k) || (countSumLess == (k - 1))) // if countSum is equal to k, then we have found the kth element

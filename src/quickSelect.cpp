@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <mpi.h>
 #include <omp.h>
 #include "quickSelect.hpp"
@@ -5,34 +6,38 @@
 void localSorting(localDataQuick &local, std::vector<uint32_t> &arr, const uint32_t start, const uint32_t end, const uint32_t p)
 {
     uint32_t i = start, j = end;
-    if (i > j)
+    if (i > j) // previous pivot was even smaller than the current one
     {
         local.count = i;
         return;
     }
+    else if (j == arr.size())
+        j--;
 
     while (true)
     {
-        while ((arr[i] <= p) && i < j)
-            i++;
+        while ((arr[i] <= p) && i <= j)
+            i++; // the count
         while ((arr[j] > p) && i < j)
             j--;
         if (i < j)
+        {
             std::swap(arr[i], arr[j]);
-
-        if (i == j || i == (j - 1))
+        }
+        else
             break;
     }
 
-    local.count = (arr[i] <= p) ? i + 1 : i; // i and j equal
+    local.count = i; // save the count and not the index
     return;
 }
 
-void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, const size_t n, const size_t np)
+void quickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const size_t n, const size_t np)
 {
     localDataQuick local;
     uint32_t start = 0, end = arr.size() - 1;
-    uint32_t p = arr[(rand() % (end - start + 1)) + start];
+    local.rightMargin = end;
+    uint32_t p = arr[(rand() % (end - start + 1)) + start], prevP = 0, prevPrevP = 0; // an alternation between pivots requires three pivot instances to be saved
     uint32_t countSum = 0, prevCountSum = 0;
     int NumTasks, SelfTID;
     int master = 0, previous = 0;
@@ -44,13 +49,13 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
 
     while (true)
     {
+        // printf("p: %d, prevP: %d, prevPrevP: %d, prevCount: %d, count: %d\n", p, prevP, prevPrevP, prevCountSum, countSum);
         localSorting(local, arr, start, end, p);
 
         if (master != SelfTID) // send local count
             MPI_Send(&local.count, 1, MPI_UINT32_T, master, 0, MPI_COMM_WORLD);
         else
         { // gather all local counts
-            prevCountSum = countSum;
             countSum = local.count;
             for (int i = 0; i < NumTasks; i++)
             {
@@ -65,33 +70,69 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
         MPI_Bcast(&countSum, 1, MPI_UINT32_T, master, MPI_COMM_WORLD);
         // printf("countSum: %d\n", countSum);
 
-        if (countSum == k || countSum == prevCountSum)
+        // if (abs(prevP - p) == 1)
+        // {
+        //     if (prevCountSum < countSum && k > prevCountSum && k < countSum)
+        //     {
+        //         kth = p; // pivot with the greatest count of the two (and thus the largest pivot value) is in the array and is the kth element
+        //         return;
+        //     }
+        //     else if (prevCountSum > countSum && k < prevCountSum && k > countSum)
+        //     {
+        //         kth = prevP;
+        //         return;
+        //     }
+        // }
+
+        if (countSum == k)
             break;
         else if (countSum > k)
         {
-            start = 0;
-            end = local.count; // check if -1 is needed, but then we have to check for the case where local.count == 0
+            start = local.leftMargin;
+            end = local.count;
+            local.rightMargin = local.count;
         }
         else // we already know that countSum != k-1
         {
-            end = arr.size() - 1;
             start = local.count;
+            end = local.rightMargin;
+            local.leftMargin = local.count;
         }
 
-        for (int i = 0; i < NumTasks; i++) // round robin to find the next master, check at most all processes if necessary
+        // printf("start: %d, end: %d, proc: %d, p: %d, prevP: %d, countSum: %d\n", start, end, SelfTID, p, prevP, countSum);
+        // MPI_Barrier(MPI_COMM_WORLD);
+
+        prevPrevP = prevP;
+        prevP = p;
+        // prevCountSum = countSum;
+
+        for (int i = 0; i < 2 * NumTasks; i++) // round robin to find the next master, check at most all processes if necessary
         {
             if (master == SelfTID)
             {
-                if (start > end)
+                // printf("master: %d, start: %d, end: %d\n", master, start, end);
+
+                if (end == 0 || start > end)           // next pivot is out of range of the master
                 {                                      // check if I don't have elements in the range of the new pivot
                     master = (SelfTID + 1) % NumTasks; // assign the next process as a master
                     previous = SelfTID;
                 }
                 else
-                {
+                { // new master has passed the test and can choose a new pivot
                     previous = master;
-                    p = arr[(rand() % (end - start + 1)) + start]; // new master has passed the test and can choose a new pivot
-                    // printf("pivot chosen: %d\n", p);
+                    // maybe shuflle the array here, from start to end
+                    size_t tempEnd = end == arr.size() ? end - 1 : end;
+                    for (size_t i = start; i < tempEnd; i++) // end <= arr.size() - 1
+                    {
+                        // p = arr[(rand() % (end - start + 1)) + start];
+                        p = arr[i];
+                        if (p != prevP && p != prevPrevP)
+                            break;
+
+                        if (i == (tempEnd - 1)) // this master has only elements equal to the previous pivot
+                            master = (SelfTID + 1) % NumTasks;
+                        // printf("pivot chosen: %d\n", p);
+                    }
                 }
                 for (int i = 0; i < NumTasks; i++)
                 {
@@ -113,11 +154,16 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
                 break;
             }
         }
+        if (p == prevP) // only elements equal to the kth's value are left
+            return;
+        else if (p == prevPrevP) // only elements equal to the kth and the kth +1/-1 elements' values are left
+        {
+            kth = std::max(prevP, prevPrevP);
+            return;
+        }
     }
 
     kth = p;
-    if (SelfTID == 0)
-        printf("kth element quick 2: %d\n", kth);
 
     return;
 }

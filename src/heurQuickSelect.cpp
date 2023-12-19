@@ -90,7 +90,7 @@ void heurlocalSorting(localDataHeurQuick &local, std::vector<uint32_t> &arr, con
             break;
     }
 
-    local.count = i; // i and j equal
+    local.count = i; // save the count and not the index
     return;
 }
 
@@ -192,9 +192,14 @@ void heurQuickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const
 
         if (abs(prevP - p) == 1)
         {
-            if (lessThan(prevCountSum, countSum) && k > prevCountSum && k < countSum)
+            if (prevCountSum < countSum && k > prevCountSum && k < countSum)
             {
                 kth = p; // pivot with the greatest count of the two (and thus the largest pivot value) is in the array and is the kth element
+                return;
+            }
+            else if (prevCountSum > countSum && k < prevCountSum && k > countSum)
+            {
+                kth = prevP;
                 return;
             }
         }
@@ -204,7 +209,7 @@ void heurQuickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const
         else if (countSum > k)
         {
             start = 0;
-            end = local.count; // check if -1 is needed, but then we have to check for the case where local.count == 0
+            end = local.count;
         }
         else
         {

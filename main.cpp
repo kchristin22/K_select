@@ -26,10 +26,11 @@ int main(int argc, char **argv)
     // arr = {4, 1, 1, 4, 2, 5, 8, 4};
     // arr = {4, 3, 5, 5, 5, 4, 1, 1};
     // arr = {3, 10, 1, 10, 3, 7, 3, 9};
+    arr = {9, 1, 2, 10, 7, 10, 7, 10};
 
     for (uint32_t i = 0; i < 8; i++)
     {
-        arr[i] = rand() % 10 + 1;
+        // arr[i] = rand() % 10 + 1;
         printf("%d, ", arr[i]);
     }
     printf("\n");
@@ -37,8 +38,9 @@ int main(int argc, char **argv)
     std::vector<std::vector<uint32_t>> arrs(4, std::vector<uint32_t>(2));
     for (uint32_t i = 0; i < 8; i += 2) // change this
     {
-        std::copy(arr.begin() + i, arr.begin() + i + 2, arrs[i / 2].begin()); // change this
+        std::copy(arr.begin() + i, arr.begin() + i + 2, arrs[i / 2].begin()); // change this    
     }
+
     int NumTasks, SelfTID;
     int kth = 0;
 
@@ -80,6 +82,11 @@ int main(int argc, char **argv)
 
     MPI_Barrier(MPI_COMM_WORLD);
 
+    for (uint32_t i = 0; i < 8; i += 2) // change this
+    {
+        std::copy(arr.begin() + i, arr.begin() + i + 2, arrs[i / 2].begin()); // change this
+    }
+
     switch (SelfTID)
     {
     case 0:
@@ -99,24 +106,29 @@ int main(int argc, char **argv)
 
     MPI_Barrier(MPI_COMM_WORLD);
 
-    // switch (SelfTID)
-    // {
-    // case 0:
-    //     quickSelect(kth, arrs[0], k, 8, NumTasks);
-    //     printf("kth element quick: %d\n", kth);
-    //     break;
-    // case 1:
-    //     quickSelect(kth, arrs[1], k, 8, NumTasks);
-    //     break;
-    // case 2:
-    //     quickSelect(kth, arrs[2], k, 8, NumTasks);
-    //     break;
-    // case 3:
-    //     quickSelect(kth, arrs[3], k, 8, NumTasks);
-    //     break;
-    // }
+    for (uint32_t i = 0; i < 8; i += 2) // change this
+    {
+        std::copy(arr.begin() + i, arr.begin() + i + 2, arrs[i / 2].begin()); // change this
+    }
 
-    // MPI_Barrier(MPI_COMM_WORLD);
+    switch (SelfTID)
+    {
+    case 0:
+        quickSelect(kth, arrs[0], k, 8, NumTasks);
+        printf("kth element quick: %d\n", kth);
+        break;
+    case 1:
+        quickSelect(kth, arrs[1], k, 8, NumTasks);
+        break;
+    case 2:
+        quickSelect(kth, arrs[2], k, 8, NumTasks);
+        break;
+    case 3:
+        quickSelect(kth, arrs[3], k, 8, NumTasks);
+        break;
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
 
     MPI_Finalize();
 
