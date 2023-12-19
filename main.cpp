@@ -27,10 +27,11 @@ int main(int argc, char **argv)
     // arr = {4, 3, 5, 5, 5, 4, 1, 1};
     // arr = {3, 10, 1, 10, 3, 7, 3, 9};
     // arr = {9, 1, 2, 10, 7, 10, 7, 10};
+    // arr = {8, 8, 8, 8, 1, 1, 1, 1};
 
     for (uint32_t i = 0; i < 8; i++)
     {
-        // arr[i] = rand() % 10 + 1;
+        arr[i] = rand() % 10 + 1;
         printf("%d, ", arr[i]);
     }
     printf("\n");

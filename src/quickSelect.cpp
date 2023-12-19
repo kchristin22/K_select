@@ -68,21 +68,6 @@ void quickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const siz
         }
 
         MPI_Bcast(&countSum, 1, MPI_UINT32_T, master, MPI_COMM_WORLD);
-        // printf("countSum: %d\n", countSum);
-
-        // if (abs(prevP - p) == 1)
-        // {
-        //     if (prevCountSum < countSum && k > prevCountSum && k < countSum)
-        //     {
-        //         kth = p; // pivot with the greatest count of the two (and thus the largest pivot value) is in the array and is the kth element
-        //         return;
-        //     }
-        //     else if (prevCountSum > countSum && k < prevCountSum && k > countSum)
-        //     {
-        //         kth = prevP;
-        //         return;
-        //     }
-        // }
 
         if (countSum == k)
             break;

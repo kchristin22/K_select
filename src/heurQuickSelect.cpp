@@ -170,6 +170,7 @@ void heurQuickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const
     int newP;
     uint32_t countSum = 0, prevCountSum = n;
     uint32_t start = 0, end = arr.size() - 1;
+    local.rightMargin = arr.size() - 1;
 
     while (true)
     {
@@ -208,13 +209,15 @@ void heurQuickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const
             break;
         else if (countSum > k)
         {
-            start = 0;
+            start = local.leftMargin;
             end = local.count;
+            local.rightMargin = local.count;
         }
         else
         {
             start = local.count;
-            end = arr.size() - 1;
+            end = local.rightMargin;
+            local.leftMargin = local.count;
         }
 
         if (countSum == prevCountSum)

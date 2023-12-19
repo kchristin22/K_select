@@ -10,6 +10,8 @@ struct localDataHeurQuick
     uint32_t localMin;
     uint32_t localMax;
     uint32_t count = 0;
+    uint32_t leftMargin = 0;
+    uint32_t rightMargin = 0;
 };
 
 inline void setComp(bool (*&comp)(const uint32_t &, const uint32_t &), const size_t k, const size_t n, const size_t countSum);
