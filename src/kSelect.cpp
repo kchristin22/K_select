@@ -199,10 +199,10 @@ void kSearch(int &kth, std::vector<uint32_t> &arr, const size_t k, const size_t 
         //                   { return (k - countSumLess) > 0 ? x < p : x > p; }); // check if arr size changes
 
         if (countSumLess == prevCountSumLess)
-            countSumLess = (k > countSumLess && prevP > p) ? countSumLess - 1 : countSumLess + 1; // change countSum instead of prevCountSum to balance
-                                                                                                  // the numerator and denominator of the pivot formula
-                                                                                                  // cannot harm the algorithm, since the relationship of countSum and k will not change
-                                                                                                  // (whichever is bigger will remain bigger)
+            prevCountSumLess = (k > countSumLess && prevP > p) ? prevCountSumLess + 1 : prevCountSumLess - 1; // change countSum instead of prevCountSum to balance
+                                                                                                              // the numerator and denominator of the pivot formula
+                                                                                                              // cannot harm the algorithm, since the relationship of countSum and k will not change
+                                                                                                              // (whichever is bigger will remain bigger)
 
         newP = p + ((k - countSumLess) * (prevP - p)) / (prevCountSumLess - countSumLess); // find pivot
         if (newP < (int)min)

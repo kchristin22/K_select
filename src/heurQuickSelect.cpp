@@ -218,7 +218,7 @@ void heurQuickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const
         }
 
         if (countSum == prevCountSum)
-            countSum = (k > countSum && prevP > p) ? countSum - 1 : countSum + 1;
+            prevCountSum = (k > countSum && prevP > p) ? prevCountSum + 1 : prevCountSum - 1;
 
         newP = p + ((k - countSum) * (prevP - p)) / (prevCountSum - countSum); // find pivot
         if (newP < (int)min)
