@@ -52,20 +52,7 @@ void quickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const siz
         // printf("p: %d, prevP: %d, prevPrevP: %d, prevCount: %d, count: %d\n", p, prevP, prevPrevP, prevCountSum, countSum);
         localSorting(local, arr, start, end, p);
 
-        if (master != SelfTID) // send local count
-            MPI_Send(&local.count, 1, MPI_UINT32_T, master, 0, MPI_COMM_WORLD);
-        else
-        { // gather all local counts
-            countSum = local.count;
-            for (int i = 0; i < NumTasks; i++)
-            {
-                if (i == master)
-                    continue;
-                uint32_t temp;
-                MPI_Recv(&temp, 1, MPI_UINT32_T, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                countSum += temp;
-            }
-        }
+        MPI_Reduce(&local.count, &countSum, 1, MPI_UINT32_T, MPI_SUM, master, MPI_COMM_WORLD);
 
         MPI_Bcast(&countSum, 1, MPI_UINT32_T, master, MPI_COMM_WORLD);
 

@@ -102,33 +102,12 @@ void kSearch(int &kth, std::vector<uint32_t> &arr, const size_t k, const size_t 
     int SelfTID;
     MPI_Comm_rank(MPI_COMM_WORLD, &SelfTID);
 
-    if (SelfTID != 0) // send local min and max
-        MPI_Send(&local.localMin, 1, MPI_UINT32_T, 0, 0, MPI_COMM_WORLD);
-    else
-    { // gather all local min and max
-        for (size_t i = 1; i < np; i++)
-        {
-            uint32_t temp;
-            MPI_Recv(&temp, 1, MPI_UINT32_T, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            if (temp < min)
-                min = temp;
-        }
-    }
+    // reduce only the local mins of the processes and not with all their elements
+    MPI_Reduce(&local.localMin, &min, 1, MPI_UINT32_T, MPI_MIN, 0, MPI_COMM_WORLD);
 
     MPI_Bcast(&min, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
 
-    if (SelfTID != 0) // send local min and max
-        MPI_Send(&max, 1, MPI_UINT32_T, 0, 0, MPI_COMM_WORLD);
-    else
-    { // gather all local min and max
-        for (size_t i = 1; i < np; i++)
-        {
-            uint32_t temp;
-            MPI_Recv(&temp, 1, MPI_UINT32_T, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            if (temp > max)
-                max = temp;
-        }
-    }
+    MPI_Reduce(&local.localMax, &max, 1, MPI_UINT32_T, MPI_MAX, 0, MPI_COMM_WORLD);
 
     MPI_Bcast(&max, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
 
@@ -158,18 +137,7 @@ void kSearch(int &kth, std::vector<uint32_t> &arr, const size_t k, const size_t 
 
         findLocalCount(local, arr, p, comp, k, n); // find local count
 
-        if (SelfTID != 0) // send local count
-            MPI_Send(&local.count, 1, MPI_UINT32_T, 0, 0, MPI_COMM_WORLD);
-        else
-        { // gather all local counts
-            countSumLess = local.count;
-            for (size_t i = 1; i < np; i++)
-            {
-                uint32_t temp;
-                MPI_Recv(&temp, 1, MPI_UINT32_T, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                countSumLess += temp;
-            }
-        }
+        MPI_Reduce(&local.count, &countSumLess, 1, MPI_UINT32_T, MPI_SUM, 0, MPI_COMM_WORLD);
 
         MPI_Bcast(&countSumLess, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
 
@@ -238,7 +206,7 @@ void kSearch(int &kth, std::vector<uint32_t> &arr, const size_t k, const size_t 
                 if (!comp(kth, p))
                     kth = temp;
                 else
-                    kth = abs(p - temp) < abs(p - kth) ? temp : kth;
+                    kth = abs(p - temp) < abs(p - kth) ? temp : kth; // reduce with abs(p - kth) to find the closest element to the pivot, but check comp
             }
         }
     }

@@ -23,7 +23,7 @@ int main(int argc, char **argv)
     }
     srand(time(NULL));
     printf("arr: ");
-    // arr = {8, 8, 8, 9, 9, 8, 2, 4};
+    arr = {8, 8, 8, 9, 9, 8, 2, 4};
     // arr = {4, 4, 4, 2, 1, 2, 3, 2};
     // arr = {1, 2, 3, 4, 5, 6, 7, 8};
     // arr = {3, 1, 4, 2, 6, 10, 10, 9};
@@ -36,7 +36,7 @@ int main(int argc, char **argv)
 
     for (uint32_t i = 0; i < 8; i++)
     {
-        arr[i] = rand() % 10 + 1;
+        // arr[i] = rand() % 10 + 1;
         printf("%d, ", arr[i]);
     }
     printf("\n");
