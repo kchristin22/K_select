@@ -38,7 +38,7 @@ void quickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const siz
     uint32_t start = 0, end = arr.size() - 1;
     local.rightMargin = end;
     uint32_t p = arr[(rand() % (end - start + 1)) + start], prevP = 0, prevPrevP = 0; // an alternation between pivots requires three pivot instances to be saved
-    uint32_t countSum = 0, prevCountSum = 0;
+    uint32_t countSum = 0;
     int NumTasks, SelfTID;
     int master = 0, previous = 0;
 
@@ -106,25 +106,22 @@ void quickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const siz
                         // printf("pivot chosen: %d\n", p);
                     }
                 }
-                for (int i = 0; i < NumTasks; i++)
-                {
-                    if (i == SelfTID)
-                        continue;
-                    MPI_Send(&master, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
-                    MPI_Send(&previous, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
-                }
+                // for (int i = 0; i < NumTasks; i++)
+                // {
+                //     if (i == SelfTID)
+                //         continue;
+                //     MPI_Send(&master, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
+                //     MPI_Send(&previous, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
+                // }
             }
-            else
-            {
-                previous = master;
-                MPI_Recv(&master, 1, MPI_INT, master, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                MPI_Recv(&previous, 1, MPI_INT, previous, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            }
+            MPI_Bcast(&master, 1, MPI_INT, previous, MPI_COMM_WORLD);
             if (master == previous)
             {
                 MPI_Bcast(&p, 1, MPI_UINT32_T, master, MPI_COMM_WORLD);
                 break;
             }
+            else
+                previous = master;
         }
         if (p == prevP) // only elements equal to the kth's value are left
             return;
