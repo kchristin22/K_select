@@ -49,7 +49,6 @@ void quickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const siz
 
     while (true)
     {
-        // printf("p: %d, prevP: %d, prevPrevP: %d, prevCount: %d, count: %d\n", p, prevP, prevPrevP, prevCountSum, countSum);
         localSorting(local, arr, start, end, p);
 
         MPI_Reduce(&local.count, &countSum, 1, MPI_UINT32_T, MPI_SUM, master, MPI_COMM_WORLD);
@@ -71,19 +70,13 @@ void quickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const siz
             local.leftMargin = local.count;
         }
 
-        // printf("start: %d, end: %d, proc: %d, p: %d, prevP: %d, countSum: %d\n", start, end, SelfTID, p, prevP, countSum);
-        // MPI_Barrier(MPI_COMM_WORLD);
-
         prevPrevP = prevP;
         prevP = p;
-        // prevCountSum = countSum;
 
         for (int i = 0; i < 2 * NumTasks; i++) // round robin to find the next master, check at most all processes if necessary
         {
             if (master == SelfTID)
             {
-                // printf("master: %d, start: %d, end: %d\n", master, start, end);
-
                 if (end == 0 || start > end)           // next pivot is out of range of the master
                 {                                      // check if I don't have elements in the range of the new pivot
                     master = (SelfTID + 1) % NumTasks; // assign the next process as a master
@@ -103,16 +96,8 @@ void quickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const siz
 
                         if (i == (tempEnd - 1)) // this master has only elements equal to the previous pivot
                             master = (SelfTID + 1) % NumTasks;
-                        // printf("pivot chosen: %d\n", p);
                     }
                 }
-                // for (int i = 0; i < NumTasks; i++)
-                // {
-                //     if (i == SelfTID)
-                //         continue;
-                //     MPI_Send(&master, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
-                //     MPI_Send(&previous, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
-                // }
             }
             MPI_Bcast(&master, 1, MPI_INT, previous, MPI_COMM_WORLD);
             if (master == previous)

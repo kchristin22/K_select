@@ -29,14 +29,14 @@ int main(int argc, char **argv)
     // arr = {3, 1, 4, 2, 6, 10, 10, 9};
     // arr = {10, 10, 3, 10, 10, 7, 5, 6};
     // arr = {4, 1, 1, 4, 2, 5, 8, 4};
-    // arr = {4, 3, 5, 5, 5, 4, 1, 1};
+    arr = {4, 3, 5, 5, 5, 4, 1, 1};
     // arr = {3, 10, 1, 10, 3, 7, 3, 9};
     // arr = {9, 1, 2, 10, 7, 10, 7, 10};
     // arr = {8, 8, 8, 8, 1, 1, 1, 1};
 
     for (uint32_t i = 0; i < 8; i++)
     {
-        arr[i] = rand() % 10 + 1;
+        // arr[i] = rand() % 10 + 1;
         printf("%d, ", arr[i]);
     }
     printf("\n");
@@ -85,6 +85,8 @@ int main(int argc, char **argv)
         printf("kth element heur: %d\n", kth);
 
     MPI_Barrier(MPI_COMM_WORLD);
+
+    MPI_Scatter(arr.data(), 2, MPI_UINT32_T, arrs[SelfTID].data(), 2, MPI_UINT32_T, 0, MPI_COMM_WORLD);
 
     quickSelect(kth, arrs[SelfTID], k, arr.size(), NumTasks);
 

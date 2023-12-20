@@ -1,3 +1,4 @@
+#include <limits.h>
 #include <omp.h>
 #include <mpi.h>
 #include "kSelect.hpp"
@@ -88,6 +89,9 @@ void findClosest(int &closest, const std::vector<uint32_t> &arr, const int &p, b
             closest = comp(closest, p) && comp(arr[i], closest) ? closest : arr[i];
         }
     }
+
+    if (!comp(closest, p))
+        closest = p > 0 ? INT_MIN : INT_MAX; // if there is no element fulfilling the condition, return INT_MAX to increase its distance from the pivot
 
     return;
 }
@@ -193,23 +197,12 @@ void kSearch(int &kth, std::vector<uint32_t> &arr, const size_t k, const size_t 
     // find local potential kth element
     findClosest(kth, arr, p, comp);
 
-    if (SelfTID != 0)
-        MPI_Send(&kth, 1, MPI_UINT32_T, 0, 0, MPI_COMM_WORLD);
-    else
-    {
-        for (size_t i = 1; i < np; i++)
-        {
-            uint32_t temp;
-            MPI_Recv(&temp, 1, MPI_UINT32_T, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            if (comp(temp, p))
-            {
-                if (!comp(kth, p))
-                    kth = temp;
-                else
-                    kth = abs(p - temp) < abs(p - kth) ? temp : kth; // reduce with abs(p - kth) to find the closest element to the pivot, but check comp
-            }
-        }
-    }
+    uint32_t localDistance = abs(p - kth), distance;
+
+    MPI_Reduce(&localDistance, &distance, 1, MPI_UINT32_T, MPI_MIN, 0, MPI_COMM_WORLD); // find the overall closest element to the pivot
+                                                                                        // that fullfills the condition imposed by the countSum-k relation
+
+    kth = (countSumLess == k) ? p - distance : p + distance; // calculate the kth element
 
     return;
 }
