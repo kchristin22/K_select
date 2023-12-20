@@ -107,13 +107,9 @@ void kSearch(int &kth, std::vector<uint32_t> &arr, const size_t k, const size_t 
     MPI_Comm_rank(MPI_COMM_WORLD, &SelfTID);
 
     // reduce only the local mins of the processes and not with all their elements
-    MPI_Reduce(&local.localMin, &min, 1, MPI_UINT32_T, MPI_MIN, 0, MPI_COMM_WORLD);
+    MPI_Allreduce(&local.localMin, &min, 1, MPI_UINT32_T, MPI_MIN, MPI_COMM_WORLD);
 
-    MPI_Bcast(&min, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
-
-    MPI_Reduce(&local.localMax, &max, 1, MPI_UINT32_T, MPI_MAX, 0, MPI_COMM_WORLD);
-
-    MPI_Bcast(&max, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
+    MPI_Allreduce(&local.localMax, &max, 1, MPI_UINT32_T, MPI_MAX, MPI_COMM_WORLD);
 
     if (min == max)
     {
@@ -141,9 +137,7 @@ void kSearch(int &kth, std::vector<uint32_t> &arr, const size_t k, const size_t 
 
         findLocalCount(local, arr, p, comp, k, n); // find local count
 
-        MPI_Reduce(&local.count, &countSumLess, 1, MPI_UINT32_T, MPI_SUM, 0, MPI_COMM_WORLD);
-
-        MPI_Bcast(&countSumLess, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
+        MPI_Allreduce(&local.count, &countSumLess, 1, MPI_UINT32_T, MPI_SUM, MPI_COMM_WORLD);
 
         if (abs(prevP - p) == 1)
         {
@@ -199,7 +193,7 @@ void kSearch(int &kth, std::vector<uint32_t> &arr, const size_t k, const size_t 
 
     uint32_t localDistance = abs(p - kth), distance;
 
-    MPI_Reduce(&localDistance, &distance, 1, MPI_UINT32_T, MPI_MIN, 0, MPI_COMM_WORLD); // find the overall closest element to the pivot
+    MPI_Allreduce(&localDistance, &distance, 1, MPI_UINT32_T, MPI_MIN, MPI_COMM_WORLD); // find the overall closest element to the pivot
                                                                                         // that fullfills the condition imposed by the countSum-k relation
 
     kth = (countSumLess == k) ? p - distance : p + distance; // calculate the kth element
