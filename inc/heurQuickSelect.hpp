@@ -5,6 +5,8 @@
 #include <vector>
 #include <stdint.h>
 
+#define CACHE_SIZE 800
+
 struct localDataHeurQuick
 {
     uint32_t localMin;

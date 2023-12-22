@@ -27,10 +27,10 @@ int main(int argc, char **argv)
     // arr = {4, 4, 4, 2, 1, 2, 3, 2};
     // arr = {1, 2, 3, 4, 5, 6, 7, 8};
     // arr = {3, 1, 4, 2, 6, 10, 10, 9};
-    // arr = {10, 10, 3, 10, 10, 7, 5, 6};
+    arr = {10, 10, 3, 10, 10, 7, 5, 6};
     // arr = {4, 1, 1, 4, 2, 5, 8, 4};
     // arr = {4, 3, 5, 5, 5, 4, 1, 1};
-    arr = {3, 10, 1, 10, 3, 7, 3, 9};
+    // arr = {3, 10, 1, 10, 3, 7, 3, 9};
     // arr = {9, 1, 2, 10, 7, 10, 7, 10};
     // arr = {8, 8, 8, 8, 1, 1, 1, 1};
 
@@ -47,7 +47,6 @@ int main(int argc, char **argv)
     int kth = 0;
 
     MPI_Init(NULL, NULL);
-    // MPI_Barrier_init(MPI_COMM_WORLD, NULL, NULL);
 
     MPI_Comm_size(MPI_COMM_WORLD, &NumTasks);
     MPI_Comm_rank(MPI_COMM_WORLD, &SelfTID);
@@ -75,7 +74,7 @@ int main(int argc, char **argv)
         }
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD); // no need for a single barrier request here, the use of the barrier is out of scope of the program (not included in the timings)
 
     MPI_Scatter(arr.data(), 2, MPI_UINT32_T, arrs[SelfTID].data(), 2, MPI_UINT32_T, 0, MPI_COMM_WORLD);
 

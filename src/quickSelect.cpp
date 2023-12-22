@@ -42,18 +42,37 @@ void quickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const siz
     int NumTasks, SelfTID;
     int master = 0, previous = 0;
 
-    MPI_Comm_size(MPI_COMM_WORLD, &NumTasks);
-    MPI_Comm_rank(MPI_COMM_WORLD, &SelfTID);
+    MPI_Comm proc = MPI_COMM_WORLD;
 
-    MPI_Bcast(&p, 1, MPI_UINT32_T, master, MPI_COMM_WORLD);
+    std::vector<uint32_t> array;
+    bool gathered = false;
+
+    if (array.size() * np < CACHE_SIZE / 2)
+    {
+        array.resize(arr.size() * np);
+        MPI_Gather(arr.data(), arr.size(), MPI_UINT32_T, array.data(), arr.size(), MPI_UINT32_T, 0, proc);
+
+        if (SelfTID != 0)
+            return;
+
+        proc = MPI_COMM_SELF;
+        gathered = true;
+    }
+    else
+    array = std::move(arr);
+
+    MPI_Comm_size(proc, &NumTasks);
+    MPI_Comm_rank(proc, &SelfTID);
+
+    MPI_Bcast(&p, 1, MPI_UINT32_T, master, proc);
 
     while (true)
     {
-        localSorting(local, arr, start, end, p);
+        localSorting(local, array, start, end, p);
 
-        MPI_Reduce(&local.count, &countSum, 1, MPI_UINT32_T, MPI_SUM, master, MPI_COMM_WORLD);
+        MPI_Reduce(&local.count, &countSum, 1, MPI_UINT32_T, MPI_SUM, master, proc);
 
-        MPI_Bcast(&countSum, 1, MPI_UINT32_T, master, MPI_COMM_WORLD);
+        MPI_Bcast(&countSum, 1, MPI_UINT32_T, master, proc);
 
         if (countSum == k)
             break;
@@ -68,6 +87,42 @@ void quickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const siz
             start = local.count;
             end = local.rightMargin;
             local.leftMargin = local.count;
+        }
+
+        if (gathered == false && countSum > k && countSum < CACHE_SIZE / 2) // work on cache condition
+        {
+            std::vector<uint32_t> tempArr(countSum); // store local array
+            std::vector<int> recvCount(np);
+            std::vector<int> disp(np);
+
+            MPI_Gather(&local.count, 1, MPI_INT, recvCount.data(), 1, MPI_UINT32_T, 0, proc);
+
+            for (size_t i = 1; i < np; i++)
+                disp[i] = disp[i - 1] + recvCount[i - 1];
+
+            MPI_Gatherv(array.data(), local.count, MPI_UINT32_T, tempArr.data(), recvCount.data(), disp.data(), MPI_UINT32_T, 0, proc);
+
+            if (SelfTID != 0)
+                return;
+
+            array.resize(countSum);
+            array = std::move(tempArr); // we lose the local array here, we can copy it if we want to keep it but maybe both won't fit in memory
+
+            proc = MPI_COMM_SELF;
+            gathered = true;
+            NumTasks = 1;
+            master = 0;
+
+            // reset start and end
+            start = 0;
+            end = array.size() - 1;
+
+            printf("arr left: ");
+            for (size_t i = 0; i < array.size(); i++)
+            {
+                printf("%d, ", array[i]);
+            }
+            printf("\n");
         }
 
         prevPrevP = prevP;
@@ -85,12 +140,12 @@ void quickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const siz
                 else
                 { // new master has passed the test and can choose a new pivot
                     previous = master;
-                    // maybe shuflle the array here, from start to end
-                    size_t tempEnd = end == arr.size() ? end - 1 : end;
+                    // we could shuflle the array, from start to end, before choosing the first fit value of the array
+                    size_t tempEnd = end == array.size() ? end - 1 : end;
                     for (size_t i = start; i < tempEnd; i++) // end <= arr.size() - 1
                     {
-                        // p = arr[(rand() % (end - start + 1)) + start];
-                        p = arr[i];
+                        // p = array[(rand() % (end - start + 1)) + start];
+                        p = array[i];
                         if (p != prevP && p != prevPrevP)
                             break;
 
@@ -99,17 +154,17 @@ void quickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const siz
                     }
                 }
             }
-            MPI_Bcast(&master, 1, MPI_INT, previous, MPI_COMM_WORLD);
+            MPI_Bcast(&master, 1, MPI_INT, previous, proc);
             if (master == previous)
             {
-                MPI_Bcast(&p, 1, MPI_UINT32_T, master, MPI_COMM_WORLD);
+                MPI_Bcast(&p, 1, MPI_UINT32_T, master, proc);
                 break;
             }
             else
                 previous = master;
         }
         if (p == prevP) // only elements equal to the kth's value are left
-            return;
+            break;
         else if (p == prevPrevP) // only elements equal to the kth and the kth +1/-1 elements' values are left
         {
             kth = std::max(prevP, prevPrevP);

@@ -116,17 +116,36 @@ void heurfindClosest(int &closest, const std::vector<uint32_t> &arr, const uint3
 
 void heurQuickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const size_t n, const size_t np)
 {
-    localDataHeurQuick local;
-    findLocalMinMax(local, arr);
-
-    uint32_t min = local.localMin, max = local.localMax;
-
     int SelfTID;
     MPI_Comm_rank(MPI_COMM_WORLD, &SelfTID);
 
-    MPI_Allreduce(&local.localMin, &min, 1, MPI_UINT32_T, MPI_MIN, MPI_COMM_WORLD);
+    MPI_Comm proc = MPI_COMM_WORLD;
 
-    MPI_Allreduce(&local.localMax, &max, 1, MPI_UINT32_T, MPI_MAX, MPI_COMM_WORLD);
+    std::vector<uint32_t> array;
+    bool gathered = false;
+
+    if (array.size() * np < CACHE_SIZE / 2)
+    {
+        array.resize(arr.size() * np);
+        MPI_Gather(arr.data(), arr.size(), MPI_UINT32_T, array.data(), arr.size(), MPI_UINT32_T, 0, MPI_COMM_WORLD);
+
+        if (SelfTID != 0)
+            return;
+
+        proc = MPI_COMM_SELF;
+        gathered = true;
+    }
+    else
+        array = std::move(arr);
+
+    localDataHeurQuick local;
+    findLocalMinMax(local, array);
+
+    uint32_t min = local.localMin, max = local.localMax;
+
+    MPI_Allreduce(&local.localMin, &min, 1, MPI_UINT32_T, MPI_MIN, proc);
+
+    MPI_Allreduce(&local.localMax, &max, 1, MPI_UINT32_T, MPI_MAX, proc);
 
     if (min == max)
     {
@@ -147,14 +166,14 @@ void heurQuickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const
     int p = min, prevP = max;
     int newP;
     uint32_t countSum = 0, prevCountSum = n;
-    uint32_t start = 0, end = arr.size() - 1;
-    local.rightMargin = arr.size() - 1;
+    uint32_t start = 0, end = array.size() - 1;
+    local.rightMargin = array.size() - 1;
 
     while (true)
     {
-        heurlocalSorting(local, arr, start, end, p); // find local count
+        heurlocalSorting(local, array, start, end, p); // find local count
 
-        MPI_Allreduce(&local.count, &countSum, 1, MPI_UINT32_T, MPI_SUM, MPI_COMM_WORLD);
+        MPI_Allreduce(&local.count, &countSum, 1, MPI_UINT32_T, MPI_SUM, proc);
 
         if (abs(prevP - p) == 1)
         {
@@ -185,6 +204,41 @@ void heurQuickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const
             local.leftMargin = local.count;
         }
 
+        // gather the array if i) it is not gathered already, ii) the pivot is larger than the kth and iii) the size is small enough
+        if (gathered == false && countSum > k && countSum < CACHE_SIZE / 2) // work on cache condition
+        {
+            std::vector<uint32_t> tempArr(countSum); // store local array
+            std::vector<int> recvCount(np);
+            std::vector<int> disp(np);
+
+            MPI_Gather(&local.count, 1, MPI_INT, recvCount.data(), 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
+
+            for (size_t i = 1; i < np; i++)
+                disp[i] = disp[i - 1] + recvCount[i - 1];
+
+            MPI_Gatherv(array.data(), local.count, MPI_UINT32_T, tempArr.data(), recvCount.data(), disp.data(), MPI_UINT32_T, 0, MPI_COMM_WORLD);
+
+            if (SelfTID != 0)
+                return;
+
+            array.resize(countSum);
+            array = std::move(tempArr); // we lose the local array here, we can copy it if we want to keep it but maybe both won't fit in memory
+
+            proc = MPI_COMM_SELF;
+            gathered = true;
+
+            // reset start and end
+            start = 0;
+            end = array.size() - 1;
+
+            printf("arr left: ");
+            for (size_t i = 0; i < array.size(); i++)
+            {
+                printf("%d, ", array[i]);
+            }
+            printf("\n");
+        }
+
         if (countSum == prevCountSum)
             prevCountSum = (k > countSum && prevP > p) ? prevCountSum + 1 : prevCountSum - 1;
 
@@ -204,12 +258,12 @@ void heurQuickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const
     bool (*comp)(const uint32_t &, const uint32_t &); // set comp based on countSum
     setComp(comp, k, n, countSum);
 
-    heurfindClosest(kth, arr, p, comp);
+    heurfindClosest(kth, array, p, comp);
 
     uint32_t localDistance = abs(p - kth), distance;
 
-    MPI_Allreduce(&localDistance, &distance, 1, MPI_UINT32_T, MPI_MIN, MPI_COMM_WORLD); // find the overall closest element to the pivot
-                                                                                        // that fullfills the condition imposed by the countSum-k relation
+    MPI_Allreduce(&localDistance, &distance, 1, MPI_UINT32_T, MPI_MIN, proc); // find the overall closest element to the pivot
+                                                                              // that fullfills the condition imposed by the countSum-k relation
 
     kth = (countSum == k) ? p - distance : p + distance; // calculate the kth element
 
