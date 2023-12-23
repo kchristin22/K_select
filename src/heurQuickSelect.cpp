@@ -81,6 +81,18 @@ void heurlocalSorting(localDataHeurQuick &local, std::vector<uint32_t> &arr, con
 
     while (true)
     {
+        // #pragma omp parallel
+        //         {
+        //             printf("thread: %d\n", omp_get_thread_num());
+        // #pragma omp for nowait
+        //             for (size_t i = 0; i < 4; i++)
+        //                 printf("i: %d\n", i);
+        //         }
+        // for (size_t k = start; k <= j; k++)
+        // {
+        //     if (arr[k] <= p) // work in chunks and atomic
+        //         i++;         // the count
+        // }
         while ((arr[i] <= p) && i <= j)
             i++; // the count
         while ((arr[j] > p) && i < j)
@@ -95,21 +107,17 @@ void heurlocalSorting(localDataHeurQuick &local, std::vector<uint32_t> &arr, con
     return;
 }
 
-void heurfindClosest(int &closest, const std::vector<uint32_t> &arr, const uint32_t &p, bool (*comp)(const uint32_t &, const uint32_t &))
-{ // check for custom reduction with template functions
-    closest = arr[0];
-#pragma omp parallel for
-    for (size_t i = 1; i < arr.size(); i++) // change limits
+void findClosest(uint32_t &distance, const std::vector<uint32_t> &arr, const uint32_t start, const uint32_t end, const uint32_t &p, bool (*comp)(const uint32_t &, const uint32_t &))
+{
+    distance = INT_MAX; // if there is no element fulfilling the condition, return INT_MAX to increase its distance from the pivot
+#pragma omp parallel for reduction(min : distance)
+    for (size_t i = start; i <= end; i++) // end refers to an index inside the array (see localSorting)
     {
         if (comp(arr[i], p))
         {
-#pragma omp atomic write
-            closest = comp(closest, p) && comp(arr[i], closest) ? closest : arr[i];
+            distance = abs(arr[i] - p) < distance ? abs(arr[i] - p) : distance; // smallest distance from the pivot that fullfills the condition
         }
     }
-
-    if (!comp(closest, p))
-        closest = p > 0 ? INT_MIN : INT_MAX; // if there is no element fulfilling the condition, return INT_MAX to increase its distance from the pivot
 
     return;
 }
@@ -137,6 +145,13 @@ void heurQuickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const
     }
     else
         array = std::move(arr);
+
+    // printf("arr: ");
+    // for (size_t i = 0; i < array.size(); i++)
+    // {
+    //     printf("%d, ", array[i]);
+    // }
+    // printf("\n");
 
     localDataHeurQuick local;
     findLocalMinMax(local, array);
@@ -189,9 +204,7 @@ void heurQuickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const
             }
         }
 
-        if (k == countSum || countSum == (k - 1)) // if countSum is equal to k, then we have found the kth element
-            break;
-        else if (countSum > k)
+        if (countSum >= k)
         {
             start = local.leftMargin;
             end = local.count;
@@ -203,6 +216,9 @@ void heurQuickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const
             end = local.rightMargin;
             local.leftMargin = local.count;
         }
+
+        if (k == countSum || countSum == (k - 1)) // if countSum is equal to k, then we have found the kth element
+            break;
 
         // gather the array if i) it is not gathered already, ii) the pivot is larger than the kth and iii) the size is small enough
         if (gathered == false && countSum > k && countSum < CACHE_SIZE / 2) // work on cache condition
@@ -258,9 +274,12 @@ void heurQuickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const
     bool (*comp)(const uint32_t &, const uint32_t &); // set comp based on countSum
     setComp(comp, k, n, countSum);
 
-    heurfindClosest(kth, array, p, comp);
+    uint32_t localDistance, distance;
 
-    uint32_t localDistance = abs(p - kth), distance;
+    start %= array.size();
+    end %= array.size(); // end refers to an index inside the array (see localSorting)
+
+    findClosest(localDistance, array, start, end, p, comp);
 
     MPI_Allreduce(&localDistance, &distance, 1, MPI_UINT32_T, MPI_MIN, proc); // find the overall closest element to the pivot
                                                                               // that fullfills the condition imposed by the countSum-k relation

@@ -1,7 +1,7 @@
 #include <limits.h>
 #include <omp.h>
 #include <mpi.h>
-#include "kSelect.hpp"
+#include "kSearch.hpp"
 
 inline bool lessEqualThan(const uint32_t &a, const uint32_t &b)
 {
@@ -77,21 +77,17 @@ inline void findLocalCount(localData &local, const std::vector<uint32_t> &arr, c
     return;
 }
 
-void findClosest(int &closest, const std::vector<uint32_t> &arr, const int &p, bool (*comp)(const uint32_t &, const uint32_t &))
-{ // check for custom reduction with template functions
-    closest = arr[0];
-#pragma omp parallel for
-    for (size_t i = 1; i < arr.size(); i++)
+void findClosest(uint32_t &distance, const std::vector<uint32_t> &arr, const int &p, bool (*comp)(const uint32_t &, const uint32_t &))
+{
+    distance = INT_MAX; // if there is no element fulfilling the condition, return INT_MAX to increase its distance from the pivot
+#pragma omp parallel for reduction(min : distance)
+    for (size_t i = 0; i < arr.size(); i++)
     {
         if (comp(arr[i], p))
         {
-#pragma omp atomic write
-            closest = comp(closest, p) && comp(arr[i], closest) ? closest : arr[i];
+            distance = abs(arr[i] - p) < distance ? abs(arr[i] - p) : distance; // smallest distance from the pivot that fullfills the condition
         }
     }
-
-    if (!comp(closest, p))
-        closest = p > 0 ? INT_MIN : INT_MAX; // if there is no element fulfilling the condition, return INT_MAX to increase its distance from the pivot
 
     return;
 }
@@ -188,10 +184,10 @@ void kSearch(int &kth, std::vector<uint32_t> &arr, const size_t k, const size_t 
     else if (countSumLess == (k - 1))
         comp = greaterThan; // the next element bigger than the pivot is the kth element
 
-    // find local potential kth element
-    findClosest(kth, arr, p, comp);
+    uint32_t localDistance, distance;
 
-    uint32_t localDistance = abs(p - kth), distance;
+    // find local potential kth element
+    findClosest(localDistance, arr, p, comp);
 
     MPI_Allreduce(&localDistance, &distance, 1, MPI_UINT32_T, MPI_MIN, MPI_COMM_WORLD); // find the overall closest element to the pivot
                                                                                         // that fullfills the condition imposed by the countSum-k relation

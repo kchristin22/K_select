@@ -1,7 +1,7 @@
 #include <iostream>
 #include <algorithm>
 #include <mpi.h>
-#include "kSelect.hpp"
+#include "kSearch.hpp"
 #include "heurQuickSelect.hpp"
 #include "quickSelect.hpp"
 
@@ -85,9 +85,9 @@ int main(int argc, char **argv)
 
     MPI_Barrier(MPI_COMM_WORLD);
 
-    MPI_Scatter(arr.data(), 2, MPI_UINT32_T, arrs[SelfTID].data(), 2, MPI_UINT32_T, 0, MPI_COMM_WORLD);
+    // MPI_Scatter(arr.data(), 2, MPI_UINT32_T, arrs[SelfTID].data(), 2, MPI_UINT32_T, 0, MPI_COMM_WORLD);
 
-    quickSelect(kth, arrs[SelfTID], k, arr.size(), NumTasks);
+    // quickSelect(kth, arrs[SelfTID], k, arr.size(), NumTasks);
 
     if (SelfTID == 0)
         printf("kth element quick: %d\n", kth);

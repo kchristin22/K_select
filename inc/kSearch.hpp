@@ -12,6 +12,6 @@ struct localData
     uint32_t count = 0;
 };
 
-void findClosest(int &closest, const std::vector<uint32_t> &arr, const int &p, bool (*comp)(const uint32_t &, const uint32_t &), const size_t k);
+void findClosest(uint32_t &distance, const std::vector<uint32_t> &arr, const int &p, bool (*comp)(const uint32_t &, const uint32_t &), const size_t k);
 
 void kSearch(int &kth, std::vector<uint32_t> &arr, const size_t k, const size_t n, const size_t np);
