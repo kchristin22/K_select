@@ -141,39 +141,14 @@ void kSearch(int &kth, std::vector<uint32_t> &arr, const size_t k, const size_t 
         return;
     }
 
-    int p = min, prevP = max;
+    int p = max, prevP = min; // use the max value as the first pivot as we know the number of elements <= p for it,
+                              // and the min value as the previous pivot to calculate the median of the range
     int newP;
-    uint32_t countSumLess = 0, prevCountSumLess = n;
+    uint32_t countSumLess = n, prevCountSumLess = 0;
     bool (*comp)(const uint32_t &, const uint32_t &) = (k < n / 2) ? lessEqualThan : greaterThan; // optimize the number of elements to count based on k's position
 
     while (true)
     {
-        findLocalCount(local, array, p, comp, k, n); // find the local number of elements that are less than or equal to the pivot
-
-        MPI_Allreduce(&local.count, &countSumLess, 1, MPI_UINT32_T, MPI_SUM, proc); // find the overall number
-
-        if (abs(prevP - p) == 1) // check for the case where there are multiple instances of some values and the pivot alternates between them
-        {
-            // if (!(prevP == (int)min && prevCountSumLess == 0)) // this is to be used if we assign the mean value to the pivot first, instead of the min
-            // { // initialization of countSumLess is not correct
-
-            // find the closest element to the pivot with the smallest count of the two
-            if (prevCountSumLess < countSumLess && k > prevCountSumLess && k < countSumLess)
-            {
-                p = prevP;
-                countSumLess = prevCountSumLess;
-                break;
-            }
-            else if (prevCountSumLess > countSumLess && k < prevCountSumLess && k > countSumLess)
-                break;
-            // }
-        }
-
-        if ((countSumLess == k) || (countSumLess == (k - 1))) // if countSum is equal to k or k-1, then we can now find the kth element
-            break;
-        // else
-        //     std::erase_if(arr, [p, k, countSumLess, comp](uint32_t x)
-        //                   { return (k - countSumLess) > 0 ? x < p : x > p; }); // check if arr size changes
 
         if (countSumLess == prevCountSumLess)
             prevCountSumLess = (k > countSumLess && prevP > p) ? prevCountSumLess + 1 : prevCountSumLess - 1; // change prevCountSum instead of countSum to not affect the next iteration of the algorithm
@@ -191,6 +166,32 @@ void kSearch(int &kth, std::vector<uint32_t> &arr, const size_t k, const size_t 
         prevP = p;
         p = newP;
         prevCountSumLess = countSumLess;
+
+        printf("p: %d, prevP: %d, newP: %d, countSumLess: %d, prevCountSumLess: %d\n", p, prevP, newP, countSumLess, prevCountSumLess);
+
+        findLocalCount(local, array, p, comp, k, n); // find the local number of elements that are less than or equal to the pivot
+
+        MPI_Allreduce(&local.count, &countSumLess, 1, MPI_UINT32_T, MPI_SUM, proc); // find the overall number
+
+        if ((countSumLess == k) || (countSumLess == (k - 1))) // if countSum is equal to k or k-1, then we can now find the kth element
+            break;
+
+        // else
+        //     std::erase_if(arr, [p, k, countSumLess, comp](uint32_t x)
+        //                   { return (k - countSumLess) > 0 ? x < p : x > p; }); // check if arr size changes
+
+        if (abs(prevP - p) == 1) // check for the case where there are multiple instances of some values and the pivot alternates between them
+        {
+            // find the closest element to the pivot with the smallest count of the two
+            if (prevCountSumLess < countSumLess && k > prevCountSumLess && k < countSumLess)
+            {
+                p = prevP;
+                countSumLess = prevCountSumLess;
+                break;
+            }
+            else if (prevCountSumLess > countSumLess && k < prevCountSumLess && k > countSumLess)
+                break;
+        }
     }
 
     if ((countSumLess >= k))
