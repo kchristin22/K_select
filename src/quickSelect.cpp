@@ -32,6 +32,42 @@ void localSorting(localDataQuick &local, std::vector<uint32_t> &arr, const uint3
     return;
 }
 
+void parSorting(localDataQuick &local, std::vector<uint32_t> &arr, const uint32_t start, const uint32_t end, const uint32_t p)
+{
+    uint32_t i = start, j = end;
+    if (i > j)
+    {
+        local.count = i;
+        return;
+    }
+    else if (j == arr.size())
+        j--;
+
+    while (i < j)
+    {
+#pragma omp parallel sections shared(i, j)
+        {
+#pragma omp section
+            {
+                while ((arr[i] <= p) && i <= j)
+                    i++; // the count
+            }
+
+#pragma omp section
+            {
+                while ((arr[j] > p) && i < j)
+                    j--;
+            }
+        }
+
+        if (i < j)
+            std::swap(arr[i], arr[j]);
+    }
+
+    local.count = i; // save the count and not the index
+    return;
+}
+
 void quickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const size_t n, const size_t np)
 {
     localDataQuick local;
@@ -59,7 +95,7 @@ void quickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const siz
         gathered = true;
     }
     else
-    array = std::move(arr);
+        array = std::move(arr);
 
     MPI_Comm_size(proc, &NumTasks);
     MPI_Comm_rank(proc, &SelfTID);
@@ -68,7 +104,7 @@ void quickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const siz
 
     while (true)
     {
-        localSorting(local, array, start, end, p);
+        parSorting(local, array, start, end, p);
 
         MPI_Reduce(&local.count, &countSum, 1, MPI_UINT32_T, MPI_SUM, master, proc);
 

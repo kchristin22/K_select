@@ -85,9 +85,11 @@ int main(int argc, char **argv)
 
     MPI_Barrier(MPI_COMM_WORLD);
 
-    // MPI_Scatter(arr.data(), 2, MPI_UINT32_T, arrs[SelfTID].data(), 2, MPI_UINT32_T, 0, MPI_COMM_WORLD);
+    std::vector<std::vector<uint32_t>> arrs2(4, std::vector<uint32_t>(2));
 
-    // quickSelect(kth, arrs[SelfTID], k, arr.size(), NumTasks);
+    MPI_Scatter(arr.data(), 2, MPI_UINT32_T, arrs2[SelfTID].data(), 2, MPI_UINT32_T, 0, MPI_COMM_WORLD);
+
+    quickSelect(kth, arrs[SelfTID], k, arr.size(), NumTasks);
 
     if (SelfTID == 0)
         printf("kth element quick: %d\n", kth);

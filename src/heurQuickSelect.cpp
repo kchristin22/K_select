@@ -68,6 +68,42 @@ void findLocalMinMax(localDataHeurQuick &local, const std::vector<uint32_t> &arr
     return;
 }
 
+void heurParSorting(localDataHeurQuick &local, std::vector<uint32_t> &arr, const uint32_t start, const uint32_t end, const uint32_t p)
+{
+    uint32_t i = start, j = end;
+    if (i > j)
+    {
+        local.count = i;
+        return;
+    }
+    else if (j == arr.size())
+        j--;
+
+    while (i < j)
+    {
+#pragma omp parallel sections shared(i, j)
+        {
+#pragma omp section
+            {
+                while ((arr[i] <= p) && i <= j)
+                    i++; // the count
+            }
+
+#pragma omp section
+            {
+                while ((arr[j] > p) && i < j)
+                    j--;
+            }
+        }
+
+        if (i < j)
+            std::swap(arr[i], arr[j]);
+    }
+
+    local.count = i; // save the count and not the index
+    return;
+}
+
 void heurlocalSorting(localDataHeurQuick &local, std::vector<uint32_t> &arr, const uint32_t start, const uint32_t end, const uint32_t p)
 {
     uint32_t i = start, j = end;
@@ -79,28 +115,14 @@ void heurlocalSorting(localDataHeurQuick &local, std::vector<uint32_t> &arr, con
     else if (j == arr.size())
         j--;
 
-    while (true)
+    while (i < j)
     {
-        // #pragma omp parallel
-        //         {
-        //             printf("thread: %d\n", omp_get_thread_num());
-        // #pragma omp for nowait
-        //             for (size_t i = 0; i < 4; i++)
-        //                 printf("i: %d\n", i);
-        //         }
-        // for (size_t k = start; k <= j; k++)
-        // {
-        //     if (arr[k] <= p) // work in chunks and atomic
-        //         i++;         // the count
-        // }
         while ((arr[i] <= p) && i <= j)
             i++; // the count
         while ((arr[j] > p) && i < j)
             j--;
         if (i < j)
             std::swap(arr[i], arr[j]);
-        else
-            break;
     }
 
     local.count = i; // save the count and not the index
@@ -186,7 +208,7 @@ void heurQuickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const
 
     while (true)
     {
-        heurlocalSorting(local, array, start, end, p); // find local count
+        heurParSorting(local, array, start, end, p); // find local count
 
         MPI_Allreduce(&local.count, &countSum, 1, MPI_UINT32_T, MPI_SUM, proc);
 
