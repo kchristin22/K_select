@@ -56,7 +56,7 @@ void findLocalMinMax(localDataHeurQuick &local, const std::vector<uint32_t> &arr
     return;
 }
 
-void heurlocalSorting(localDataHeurQuick &local, std::vector<uint32_t> &arr, const uint32_t start, const uint32_t end, const uint32_t p)
+void heurlocalSorting(localDataHeurQuick &local, std::vector<uint32_t> &arr, const size_t start, const size_t end, const uint32_t p)
 {
     uint32_t i = start, j = end;
     if (i > j) // in this implementation this signifies that the previous pivot was even smaller than the current one
@@ -70,7 +70,7 @@ void heurlocalSorting(localDataHeurQuick &local, std::vector<uint32_t> &arr, con
     while (i < j)
     {
         while ((arr[i] <= p) && i <= j)
-            i++; // the count (not the index as it can reach the size of the array)
+            i++; // the count (not the index, as it can reach the size of the array)
         while ((arr[j] > p) && i < j)
             j--;
         if (i < j)
@@ -81,7 +81,7 @@ void heurlocalSorting(localDataHeurQuick &local, std::vector<uint32_t> &arr, con
     return;
 }
 
-void heurParSorting(localDataHeurQuick &local, std::vector<uint32_t> &arr, const uint32_t start, const uint32_t end, const uint32_t p)
+void heurParSorting(localDataHeurQuick &local, std::vector<uint32_t> &arr, const size_t start, const size_t end, const uint32_t p)
 {
     uint32_t i = start, j = end;
     if (i > j)
@@ -117,7 +117,7 @@ void heurParSorting(localDataHeurQuick &local, std::vector<uint32_t> &arr, const
     return;
 }
 
-inline void setComp(bool (*&comp)(const uint32_t &, const uint32_t &), const size_t k, const size_t countSum)
+inline void setComp(bool (*&comp)(const uint32_t &, const uint32_t &), const size_t k, const uint32_t countSum)
 {
     if (countSum >= k)
         comp = lessEqualThan; // the next element less than or equal to the pivot is the kth element
@@ -127,7 +127,7 @@ inline void setComp(bool (*&comp)(const uint32_t &, const uint32_t &), const siz
     return;
 }
 
-void findClosest(uint32_t &distance, const std::vector<uint32_t> &arr, const uint32_t start, const uint32_t end, const uint32_t &p, bool (*comp)(const uint32_t &, const uint32_t &))
+void findClosest(uint32_t &distance, const std::vector<uint32_t> &arr, const size_t start, const size_t end, const uint32_t &p, bool (*comp)(const uint32_t &, const uint32_t &))
 {
     distance = INT_MAX; // if there is no element fulfilling the condition, return INT_MAX to increase its distance from the pivot
 #pragma omp parallel for reduction(min : distance)
@@ -142,7 +142,7 @@ void findClosest(uint32_t &distance, const std::vector<uint32_t> &arr, const uin
     return;
 }
 
-void heurQuickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const size_t n, const size_t np)
+void heurQuickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, const size_t n, const size_t np)
 {
     int SelfTID;
     MPI_Comm_rank(MPI_COMM_WORLD, &SelfTID);
@@ -155,7 +155,7 @@ void heurQuickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const
     if (array.size() * np < CACHE_SIZE / 2) // check if the array fits in a single machine
     {
         array.resize(arr.size() * np);
-        MPI_Gather(arr.data(), arr.size(), MPI_UINT32_T, array.data(), arr.size(), MPI_UINT32_T, 0, MPI_COMM_WORLD);
+        MPI_Gather(arr.data(), arr.size(), MPI_UINT32_T, array.data(), arr.size(), MPI_UINT32_T, 0, MPI_COMM_WORLD); // gather all the arrays in the master process
 
         if (SelfTID != 0)
             return;
@@ -165,13 +165,6 @@ void heurQuickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const
     }
     else
         array = std::move(arr);
-
-    // printf("arr: ");
-    // for (size_t i = 0; i < array.size(); i++)
-    // {
-    //     printf("%d, ", array[i]);
-    // }
-    // printf("\n");
 
     localDataHeurQuick local;
     findLocalMinMax(local, array);
@@ -200,9 +193,9 @@ void heurQuickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const
         return;
     }
 
-    int p = max, prevP = min; // use the max value as the first pivot as we know the number of elements <= p for it,
-                              // and the min value as the previous pivot to calculate the median of the range
-    int newP;
+    uint32_t p = max, prevP = min; // use the max value as the first pivot as we know the number of elements <= p for it,
+                                   // and the min value as the previous pivot to calculate the median of the range
+    uint32_t newP;
     uint32_t countSum = n, prevCountSum = 0;
     uint32_t start = 0, end = array.size() - 1;
     local.rightMargin = array.size() - 1;
@@ -212,10 +205,9 @@ void heurQuickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const
         if (countSum == prevCountSum)
             prevCountSum = (k > countSum && prevP > p) ? prevCountSum + 1 : prevCountSum - 1;
 
-        newP = p + ((k - countSum) * (prevP - p)) / (prevCountSum - countSum); // find pivot
-        if (newP < (int)min)
-            newP = min;
-        else if (newP > (int)max)
+        // find new pivot through linear interpolation, and make sure it's not out of bounds
+        newP = (int)(p + ((k - countSum) * (prevP - p)) / (prevCountSum - countSum)) > 0 ? p + ((k - countSum) * (prevP - p)) / (prevCountSum - countSum) : min;
+        if (newP > max)
             newP = max;
         else if (newP == p)
             newP = (k > countSum) ? p + 1 : p - 1;
@@ -287,13 +279,6 @@ void heurQuickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const
             // reset start and end
             start = 0;
             end = array.size() - 1;
-
-            printf("arr left: ");
-            for (size_t i = 0; i < array.size(); i++)
-            {
-                printf("%d, ", array[i]);
-            }
-            printf("\n");
         }
     }
 
@@ -312,7 +297,7 @@ void heurQuickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const
     MPI_Allreduce(&localDistance, &distance, 1, MPI_UINT32_T, MPI_MIN, proc); // find the overall closest element to the pivot
                                                                               // that fullfills the condition imposed by the countSum-k relation
 
-    kth = (countSum == k) ? p - distance : p + distance; // calculate the kth element from its distance from the pivot
+    kth = (countSum >= k) ? p - distance : p + distance; // calculate the kth element from its distance from the pivot
 
     return;
 }

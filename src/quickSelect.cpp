@@ -3,7 +3,7 @@
 #include <omp.h>
 #include "quickSelect.hpp"
 
-void localSorting(localDataQuick &local, std::vector<uint32_t> &arr, const uint32_t start, const uint32_t end, const uint32_t p)
+void localSorting(localDataQuick &local, std::vector<uint32_t> &arr, const size_t start, const size_t end, const uint32_t p)
 {
     uint32_t i = start, j = end;
     if (i > j) // in this implementation this signifies that the previous pivot was even smaller than the current one
@@ -17,7 +17,7 @@ void localSorting(localDataQuick &local, std::vector<uint32_t> &arr, const uint3
     while (true)
     {
         while ((arr[i] <= p) && i <= j)
-            i++; // the count (not the index as it can reach the size of the array)
+            i++; // the count (not the index, as it can reach the size of the array)
         while ((arr[j] > p) && i < j)
             j--;
         if (i < j)
@@ -32,7 +32,7 @@ void localSorting(localDataQuick &local, std::vector<uint32_t> &arr, const uint3
     return;
 }
 
-void parSorting(localDataQuick &local, std::vector<uint32_t> &arr, const uint32_t start, const uint32_t end, const uint32_t p)
+void parSorting(localDataQuick &local, std::vector<uint32_t> &arr, const size_t start, const size_t end, const uint32_t p)
 {
     uint32_t i = start, j = end;
     if (i > j)
@@ -68,7 +68,7 @@ void parSorting(localDataQuick &local, std::vector<uint32_t> &arr, const uint32_
     return;
 }
 
-void quickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const size_t n, const size_t np)
+void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, const size_t n, const size_t np)
 {
     localDataQuick local;
     uint32_t start = 0, end = arr.size() - 1;
@@ -86,7 +86,7 @@ void quickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const siz
     if (array.size() * np < CACHE_SIZE / 2) // check if the array fits in a single machine
     {
         array.resize(arr.size() * np);
-        MPI_Gather(arr.data(), arr.size(), MPI_UINT32_T, array.data(), arr.size(), MPI_UINT32_T, 0, proc);
+        MPI_Gather(arr.data(), arr.size(), MPI_UINT32_T, array.data(), arr.size(), MPI_UINT32_T, 0, proc); // gather all the arrays in the master process
 
         if (SelfTID != 0)
             return;
@@ -124,7 +124,7 @@ void quickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const siz
         }
 
         // gather the array if i) it is not gathered already, ii) the pivot is larger than the kth and iii) the size is small enough
-        if (gathered == false && countSum > k && countSum < CACHE_SIZE / 2) // work on cache condition
+        if (gathered == false && countSum > k && countSum < CACHE_SIZE / 2)
         {
             std::vector<uint32_t> tempArr(countSum); // store local array
             std::vector<int> recvCount(np);
@@ -154,13 +154,6 @@ void quickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const siz
             // reset start and end
             start = 0;
             end = array.size() - 1;
-
-            printf("arr left: ");
-            for (size_t i = 0; i < array.size(); i++)
-            {
-                printf("%d, ", array[i]);
-            }
-            printf("\n");
         }
 
         prevPrevP = prevP;
@@ -203,7 +196,7 @@ void quickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const siz
         }
         if (p == prevPrevP || p == prevP) // only elements equal to the kth or the kth +1/-1 elements' values are left
         {
-            kth = std::max(prevP, prevPrevP);
+            kth = std::max(prevP, prevPrevP); // k is between the two countSums
             return;
         }
     }

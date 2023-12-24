@@ -9,14 +9,14 @@
 
 int main(int argc, char **argv)
 {
-    int k;
+    size_t k;
     if (argc == 2)
         k = atoi(argv[1]);
     else
         k = k_default;
 
     std::vector<uint32_t> arr(8);
-    if (k > (int)arr.size())
+    if (k > arr.size())
     {
         printf("k is out pt array range\n");
         return 0;
@@ -44,7 +44,7 @@ int main(int argc, char **argv)
     std::vector<std::vector<uint32_t>> arrs(4, std::vector<uint32_t>(2));
 
     int NumTasks, SelfTID;
-    int kth = 0;
+    uint32_t kth = 0;
 
     MPI_Init(NULL, NULL);
 
@@ -69,7 +69,7 @@ int main(int argc, char **argv)
             printf("3rd element: %d\n", kth);
             break;
         default:
-            printf("%dth element: %d\n", k, kth);
+            printf("%ldth element: %d\n", k, kth);
             break;
         }
     }
