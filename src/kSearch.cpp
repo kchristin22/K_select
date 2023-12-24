@@ -180,15 +180,15 @@ void kSearch(int &kth, std::vector<uint32_t> &arr, const size_t k, const size_t 
 
         if (abs(prevP - p) == 1) // check for the case where there are multiple instances of some values and the pivot alternates between them
         {
-            // find the closest element to the pivot with the smallest count of the two
+            // find the closest element to the pivot with the largest count of the two
             if (prevCountSumLess < countSumLess && k > prevCountSumLess && k < countSumLess)
+                break;
+            else if (prevCountSumLess > countSumLess && k < prevCountSumLess && k > countSumLess)
             {
                 p = prevP;
                 countSumLess = prevCountSumLess;
                 break;
             }
-            else if (prevCountSumLess > countSumLess && k < prevCountSumLess && k > countSumLess)
-                break;
         }
     }
 

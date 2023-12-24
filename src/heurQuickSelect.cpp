@@ -246,15 +246,16 @@ void heurQuickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const
 
         if (abs(prevP - p) == 1) // check for the case where there are multiple instances of some values and the pivot alternates between them
         {
-            // find the closest element to the pivot with the smallest count of the two
+            // find the closest element to the pivot with the largest count of the two
             if (prevCountSum < countSum && k > prevCountSum && k < countSum)
+                break;
+
+            else if (prevCountSum > countSum && k < prevCountSum && k > countSum)
             {
                 p = prevP;
                 countSum = prevCountSum;
                 break;
             }
-            else if (prevCountSum > countSum && k < prevCountSum && k > countSum)
-                break;
         }
 
         // gather the array if i) it is not gathered already, ii) the pivot is larger than the kth and iii) the size is small enough
@@ -296,7 +297,7 @@ void heurQuickSelect(int &kth, std::vector<uint32_t> &arr, const size_t k, const
         }
     }
 
-    bool (*comp)(const uint32_t &, const uint32_t &) = nullptr;
+    bool (*comp)(const uint32_t &, const uint32_t &);
     setComp(comp, k, countSum); // set comp based on countSum and k's relation
 
     uint32_t localDistance, distance;
