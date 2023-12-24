@@ -6,6 +6,7 @@
 #include "quickSelect.hpp"
 
 #define k_default 4
+#define ARRAY_SIZE 8
 
 int main(int argc, char **argv)
 {
@@ -15,7 +16,7 @@ int main(int argc, char **argv)
     else
         k = k_default;
 
-    std::vector<uint32_t> arr(8);
+    std::vector<uint32_t> arr(ARRAY_SIZE);
     if (k > arr.size())
     {
         printf("k is out pt array range\n");
@@ -34,16 +35,14 @@ int main(int argc, char **argv)
     // arr = {9, 1, 2, 10, 7, 10, 7, 10};
     // arr = {8, 8, 8, 8, 1, 1, 1, 1};
 
-    for (uint32_t i = 0; i < 8; i++)
+    for (uint32_t i = 0; i < arr.size(); i++)
     {
         // arr[i] = rand() % 10 + 1;
         printf("%d, ", arr[i]);
     }
     printf("\n");
 
-    std::vector<std::vector<uint32_t>> arrs(4, std::vector<uint32_t>(2));
-
-    int NumTasks, SelfTID;
+    int NumTasks ,SelfTID;
     uint32_t kth = 0;
 
     MPI_Init(NULL, NULL);
@@ -51,7 +50,31 @@ int main(int argc, char **argv)
     MPI_Comm_size(MPI_COMM_WORLD, &NumTasks);
     MPI_Comm_rank(MPI_COMM_WORLD, &SelfTID);
 
-    MPI_Scatter(arr.data(), 2, MPI_UINT32_T, arrs[SelfTID].data(), 2, MPI_UINT32_T, 0, MPI_COMM_WORLD);
+    int sendCount = arr.size() / NumTasks;
+    int lastSendCount = sendCount + arr.size() % (sendCount * NumTasks);
+
+    std::vector<int> sendCounts(NumTasks);
+    std::vector<int> disp(NumTasks);
+
+    for (int i = 0; i < NumTasks; i++)
+    {
+        if (i == (NumTasks - 1))
+            sendCounts[i] = lastSendCount;
+        else
+            sendCounts[i] = sendCount;
+    }
+
+    for (int i = 1; i < NumTasks; i++)
+        disp[i] = disp[i - 1] + sendCounts[i - 1];
+
+    std::vector<std::vector<uint32_t>> arrs(NumTasks);
+    for (int i = 0; i < NumTasks; i++)
+    {
+        arrs[i].resize(sendCounts[i]);
+    }
+    
+
+    MPI_Scatterv(arr.data(), sendCounts.data(), disp.data(), MPI_UINT32_T, arrs[SelfTID].data(), sendCounts[SelfTID], MPI_UINT32_T, 0, MPI_COMM_WORLD);
 
     kSearch(kth, arrs[SelfTID], k, arr.size(), NumTasks);
 
@@ -74,9 +97,9 @@ int main(int argc, char **argv)
         }
     }
 
-    MPI_Barrier(MPI_COMM_WORLD); // no need for a single barrier request here, the use of the barrier is out of scope of the program (not included in the timings)
+    MPI_Barrier(MPI_COMM_WORLD); // no need for a single barrier request, using Barrier_init, here, the use of the barrier is out of scope of the program (not included in the timings)
 
-    MPI_Scatter(arr.data(), 2, MPI_UINT32_T, arrs[SelfTID].data(), 2, MPI_UINT32_T, 0, MPI_COMM_WORLD);
+    MPI_Scatterv(arr.data(), sendCounts.data(), disp.data(), MPI_UINT32_T, arrs[SelfTID].data(), lastSendCount, MPI_UINT32_T, 0, MPI_COMM_WORLD);
 
     heurQuickSelect(kth, arrs[SelfTID], k, arr.size(), NumTasks);
 
@@ -85,9 +108,14 @@ int main(int argc, char **argv)
 
     MPI_Barrier(MPI_COMM_WORLD);
 
-    std::vector<std::vector<uint32_t>> arrs2(4, std::vector<uint32_t>(2));
+    std::vector<std::vector<uint32_t>> arrs2(NumTasks);
 
-    MPI_Scatter(arr.data(), 2, MPI_UINT32_T, arrs2[SelfTID].data(), 2, MPI_UINT32_T, 0, MPI_COMM_WORLD);
+    for (int i = 0; i < NumTasks; i++)
+    {
+        arrs2[i].resize(sendCounts[i]);
+    }
+
+    MPI_Scatterv(arr.data(), sendCounts.data(), disp.data(), MPI_UINT32_T, arrs2[SelfTID].data(), lastSendCount, MPI_UINT32_T, 0, MPI_COMM_WORLD);
 
     quickSelect(kth, arrs[SelfTID], k, arr.size(), NumTasks);
 

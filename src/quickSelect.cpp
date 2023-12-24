@@ -128,7 +128,7 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
         {
             std::vector<uint32_t> tempArr(countSum); // store local array
             std::vector<int> recvCount(np);
-            std::vector<int> disp(np);
+            std::vector<int> disp(np, 0);
 
             // store the amount of data each process will send
             MPI_Gather(&local.count, 1, MPI_INT, recvCount.data(), 1, MPI_UINT32_T, 0, proc);
