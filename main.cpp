@@ -117,7 +117,7 @@ int main(int argc, char **argv)
 
     MPI_Scatterv(arr.data(), sendCounts.data(), disp.data(), MPI_UINT32_T, arrs2[SelfTID].data(), lastSendCount, MPI_UINT32_T, 0, MPI_COMM_WORLD);
 
-    quickSelect(kth, arrs[SelfTID], k, arr.size(), NumTasks);
+    quickSelect(kth, arrs2[SelfTID], k, arr.size(), NumTasks);
 
     if (SelfTID == 0)
         printf("kth element quick: %d\n", kth);

@@ -74,7 +74,7 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
     uint32_t start = 0, end = arr.size() - 1;
     local.rightMargin = end;
     uint32_t p = arr[(rand() % (end - start + 1)) + start], prevP = 0, prevPrevP = 0; // an alternation between pivots requires three pivot instances to be saved
-    uint32_t countSum = 0;
+    uint32_t countSum = 0, prevCountSum = 0;
     int NumTasks, SelfTID;
     int master = 0, previous = 0;
 
@@ -83,7 +83,7 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
     std::vector<uint32_t> array;
     bool gathered = false;
 
-    if (array.size() * np < CACHE_SIZE / 2) // check if the array fits in a single machine
+    if (arr.size() * np < CACHE_SIZE / 2) // check if the array fits in a single machine
     {
         array.resize(arr.size() * np);
         MPI_Gather(arr.data(), arr.size(), MPI_UINT32_T, array.data(), arr.size(), MPI_UINT32_T, 0, proc); // gather all the arrays in the master process
@@ -95,8 +95,10 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
         gathered = true;      // set flag to true to avoid re-gathering the array
     }
     else
+    {
+        array.resize(arr.size());
         array = std::move(arr);
-
+    }
     MPI_Comm_size(proc, &NumTasks); // number of processes in the communicator
     MPI_Comm_rank(proc, &SelfTID);
 
@@ -105,6 +107,10 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
     while (true)
     {
         parSorting(local, array, start, end, p); // partition the array based on the pivot
+
+        prevPrevP = prevP;
+        prevP = p;
+        prevCountSum = countSum;
 
         MPI_Allreduce(&local.count, &countSum, 1, MPI_UINT32_T, MPI_SUM, proc); // also broadcasts the number of elements <= p so all processes can do calculations with it
 
@@ -156,9 +162,6 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
             end = array.size() - 1;
         }
 
-        prevPrevP = prevP;
-        prevP = p;
-
         for (int i = 0; i < 2 * NumTasks; i++) // round robin to find the next master, check at most all processes if necessary
                                                // each potential master requires two iterations to check if it is the next master and choose a pivot or not
         {
@@ -196,12 +199,21 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
         }
         if (p == prevPrevP || p == prevP) // only elements equal to the kth or the kth +1/-1 elements' values are left
         {
-            kth = std::max(prevP, prevPrevP); // k is between the two countSums
+            if (std::clamp((uint32_t)k, prevCountSum, countSum) == k || std::clamp((uint32_t)k, countSum, prevCountSum) == k) // k is between the two countSums
+                kth = prevCountSum < countSum ? prevP : prevPrevP;                                                            // prevCountSum corresponds to the prevPrevP
+            else if (countSum > k)                                                                                            // both are larger than k
+                kth = std::min(countSum, prevCountSum) == countSum ? prevP : prevPrevP;
+            else // both are smaller than k
+                kth = std::max(countSum, prevCountSum) == countSum ? prevP : prevPrevP;
+
+            MPI_Bcast(&kth, 1, MPI_UINT32_T, master, proc); // broadcast the kth element
+
             return;
         }
     }
 
-    kth = p; // countSum == k
+    kth = p;                                        // countSum == k
+    MPI_Bcast(&kth, 1, MPI_UINT32_T, master, proc); // broadcast the kth element
 
     return;
 }

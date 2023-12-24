@@ -152,7 +152,7 @@ void heurQuickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, 
     std::vector<uint32_t> array;
     bool gathered = false;
 
-    if (array.size() * np < CACHE_SIZE / 2) // check if the array fits in a single machine
+    if (arr.size() * np < CACHE_SIZE / 2) // check if the array fits in a single machine
     {
         array.resize(arr.size() * np);
         MPI_Gather(arr.data(), arr.size(), MPI_UINT32_T, array.data(), arr.size(), MPI_UINT32_T, 0, MPI_COMM_WORLD); // gather all the arrays in the master process
@@ -164,7 +164,10 @@ void heurQuickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, 
         gathered = true;      // set flag to true to avoid re-gathering the array
     }
     else
+    {
+        array.resize(arr.size());
         array = std::move(arr);
+    }
 
     localDataHeurQuick local;
     findLocalMinMax(local, array);
@@ -211,6 +214,8 @@ void heurQuickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, 
             newP = max;
         else if (newP == p)
             newP = (k > countSum) ? p + 1 : p - 1;
+        else if (newP == prevP)
+            newP = (k > prevCountSum) ? prevP + 1 : prevP - 1; // avoid looping between two pivots
 
         prevP = p;
         p = newP;
