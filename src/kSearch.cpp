@@ -109,7 +109,7 @@ void kSearch(int &kth, std::vector<uint32_t> &arr, const size_t k, const size_t 
         if (SelfTID != 0)
             return;
 
-        proc = MPI_COMM_SELF;
+        proc = MPI_COMM_SELF; // the MPI Communicator contains only the master now
     }
     else
         array = std::move(arr);
@@ -167,11 +167,9 @@ void kSearch(int &kth, std::vector<uint32_t> &arr, const size_t k, const size_t 
         p = newP;
         prevCountSumLess = countSumLess;
 
-        printf("p: %d, prevP: %d, newP: %d, countSumLess: %d, prevCountSumLess: %d\n", p, prevP, newP, countSumLess, prevCountSumLess);
-
         findLocalCount(local, array, p, comp, k, n); // find the local number of elements that are less than or equal to the pivot
 
-        MPI_Allreduce(&local.count, &countSumLess, 1, MPI_UINT32_T, MPI_SUM, proc); // find the overall number
+        MPI_Allreduce(&local.count, &countSumLess, 1, MPI_UINT32_T, MPI_SUM, proc); // find the overall number and broadcast it so all processes can do calculations with it
 
         if ((countSumLess == k) || (countSumLess == (k - 1))) // if countSum is equal to k or k-1, then we can now find the kth element
             break;

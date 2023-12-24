@@ -39,11 +39,10 @@ inline void findLocalCount(localData &local, const std::vector<uint32_t> &arr, c
  *      arr (input): the process' array to be searched
  *      p (input): the pivot
  *      comp (input): the comparison function to compare the elements with the pivot
- *      k (input): the index of the sorted array whose element I'm looking for
  */
-void findClosest(uint32_t &distance, const std::vector<uint32_t> &arr, const int &p, const bool (*comp)(const uint32_t &, const uint32_t &), const size_t k);
+void findClosest(uint32_t &distance, const std::vector<uint32_t> &arr, const int &p, const bool (*comp)(const uint32_t &, const uint32_t &));
 
-/* Find the closest element to the pivot
+/* Find the kth element of the array
  * @param:
  *      kth (output): the kth element of the array
  *      arr (input): the process' array to be searched
