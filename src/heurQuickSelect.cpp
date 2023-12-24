@@ -144,10 +144,11 @@ void findClosest(uint32_t &distance, const std::vector<uint32_t> &arr, const siz
 
 void heurQuickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, const size_t n, const size_t np)
 {
-    int SelfTID;
-    MPI_Comm_rank(MPI_COMM_WORLD, &SelfTID);
 
-    MPI_Comm proc = MPI_COMM_WORLD;
+    MPI_Comm proc = np > 1 ? MPI_COMM_WORLD : MPI_COMM_SELF;
+
+    int SelfTID;
+    MPI_Comm_rank(proc, &SelfTID);
 
     localDataHeurQuick local;
     findLocalMinMax(local, arr);
@@ -182,7 +183,7 @@ void heurQuickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, 
     uint32_t countSum = n, prevCountSum = 0;
     uint32_t start = 0, end = arr.size() - 1;
     local.rightMargin = arr.size() - 1;
-    bool gathered = false;
+    bool gathered = np == 1 ? true : false; // already gathered prior to the call
 
     while (true)
     {
@@ -237,9 +238,10 @@ void heurQuickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, 
         }
 
         // gather the array if i) it is not gathered already, ii) the pivot is larger than the kth and iii) the size is small enough
-        if (gathered == false && countSum > k && countSum < CACHE_SIZE / 2)
+        if (gathered == false && countSum > k && countSum < CACHE_SIZE / 2) // /2 to ensure that there's enough space to have two copies of the gathered array
         {
-            std::vector<uint32_t> tempArr(countSum); // store local array
+            arr.erase(arr.begin(), arr.begin() + local.count); // remove the elements that are larger than the pivot, so there's enough space to gather the elements
+            std::vector<uint32_t> tempArr(countSum);           // store local array
             std::vector<int> recvCount(np);
             std::vector<int> disp(np, 0);
 

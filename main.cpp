@@ -52,20 +52,29 @@ int main(int argc, char **argv)
 
     if (arr.size() < CACHE_SIZE) // check if the array fits in a single machine
     {
+        NumTasks = 1;
 
-        if (SelfTID != 0)
-            return 0;
+        if (SelfTID == 0)
+        {
+            std::vector<uint32_t> arr2(ARRAY_SIZE);
+            arr2 = arr;
+            std::vector<uint32_t> arr3(ARRAY_SIZE);
+            arr3 = arr;
 
-        kSearch(kth, arr, k, arr.size(), NumTasks);
-        printf("kth element kSearch: %d\n", kth);
+            kSearch(kth, arr, k, arr.size(), NumTasks);
+            printf("kth element kSearch: %d\n", kth);
 
-        heurQuickSelect(kth, arr, k, arr.size(), NumTasks);
-        printf("kth element heur: %d\n", kth);
+            heurQuickSelect(kth, arr2, k, arr.size(), NumTasks);
+            printf("kth element heur: %d\n", kth);
 
-        quickSelect(kth, arr, k, arr.size(), NumTasks);
-        printf("kth element quick: %d\n", kth);
+            quickSelect(kth, arr3, k, arr.size(), NumTasks);
+            printf("kth element quick: %d\n", kth);
+        }
+
+        MPI_Barrier(MPI_COMM_WORLD);
 
         MPI_Finalize();
+
         return 0;
     }
 

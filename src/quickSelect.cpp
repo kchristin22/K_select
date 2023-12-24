@@ -78,10 +78,9 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
     int NumTasks, SelfTID;
     int master = 0, previous = 0;
 
-    MPI_Comm proc = MPI_COMM_WORLD;
+    MPI_Comm proc = np > 1 ? MPI_COMM_WORLD : MPI_COMM_SELF;
 
-    std::vector<uint32_t> array;
-    bool gathered = false;
+    bool gathered = np == 1 ? true : false; // already gathered prior to the call
 
     MPI_Comm_size(proc, &NumTasks); // number of processes in the communicator
     MPI_Comm_rank(proc, &SelfTID);
@@ -90,7 +89,7 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
 
     while (true)
     {
-        parSorting(local, array, start, end, p); // partition the array based on the pivot
+        parSorting(local, arr, start, end, p); // partition the array based on the pivot
 
         prevPrevP = prevP;
         prevP = p;
@@ -114,9 +113,10 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
         }
 
         // gather the array if i) it is not gathered already, ii) the pivot is larger than the kth and iii) the size is small enough
-        if (gathered == false && countSum > k && countSum < CACHE_SIZE / 2)
+        if (gathered == false && countSum > k && countSum < CACHE_SIZE / 2) // /2 to ensure that there's enough space to have two copies of the gathered array
         {
-            std::vector<uint32_t> tempArr(countSum); // store local array
+            arr.erase(arr.begin(), arr.begin() + local.count); // remove the elements that are larger than the pivot, so there's enough space to gather the elements
+            std::vector<uint32_t> tempArr(countSum);           // store local array
             std::vector<int> recvCount(np);
             std::vector<int> disp(np, 0);
 
@@ -128,13 +128,13 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
                 disp[i] = disp[i - 1] + recvCount[i - 1];
 
             // use Gatherv to gather different amounts of data from each process
-            MPI_Gatherv(array.data(), local.count, MPI_UINT32_T, tempArr.data(), recvCount.data(), disp.data(), MPI_UINT32_T, 0, proc);
+            MPI_Gatherv(arr.data(), local.count, MPI_UINT32_T, tempArr.data(), recvCount.data(), disp.data(), MPI_UINT32_T, 0, proc);
 
             if (SelfTID != 0)
                 return;
 
-            array.resize(countSum);
-            array = std::move(tempArr); // we lose the local array here, we can copy it if we want to keep it but maybe both won't fit in memory
+            arr.resize(countSum);
+            arr = std::move(tempArr); // we lose the local array here, we can copy it if we want to keep it but maybe both won't fit in memory
 
             proc = MPI_COMM_SELF;
             gathered = true;
@@ -143,7 +143,7 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
 
             // reset start and end
             start = 0;
-            end = array.size() - 1;
+            end = arr.size() - 1;
         }
 
         for (int i = 0; i < 2 * NumTasks; i++) // round robin to find the next master, check at most all processes if necessary
@@ -160,10 +160,10 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
                 { // new master has passed the test and can choose a new pivot
                     previous = master;
                     // we could shuflle the array, from start to end, before choosing the first fit value of this range
-                    size_t tempEnd = end == array.size() ? end - 1 : end;
+                    size_t tempEnd = end == arr.size() ? end - 1 : end;
                     for (size_t i = start; i < tempEnd; i++) // end <= arr.size() - 1
                     {
-                        p = array[i];
+                        p = arr[i];
                         if (p != prevP && p != prevPrevP) // we want to choose a different pivot than the previous two to avoid infinite loops
                             break;
 
