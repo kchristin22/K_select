@@ -6,7 +6,7 @@
 #include "quickSelect.hpp"
 
 #define k_default 4
-#define ARRAY_SIZE 8
+#define ARRAY_SIZE 10
 
 int main(int argc, char **argv)
 {
@@ -42,7 +42,7 @@ int main(int argc, char **argv)
     }
     printf("\n");
 
-    int NumTasks ,SelfTID;
+    int NumTasks, SelfTID;
     uint32_t kth = 0;
 
     MPI_Init(NULL, NULL);
@@ -50,19 +50,31 @@ int main(int argc, char **argv)
     MPI_Comm_size(MPI_COMM_WORLD, &NumTasks);
     MPI_Comm_rank(MPI_COMM_WORLD, &SelfTID);
 
+    if (arr.size() < CACHE_SIZE) // check if the array fits in a single machine
+    {
+
+        if (SelfTID != 0)
+            return 0;
+
+        kSearch(kth, arr, k, arr.size(), NumTasks);
+        printf("kth element kSearch: %d\n", kth);
+
+        heurQuickSelect(kth, arr, k, arr.size(), NumTasks);
+        printf("kth element heur: %d\n", kth);
+
+        quickSelect(kth, arr, k, arr.size(), NumTasks);
+        printf("kth element quick: %d\n", kth);
+
+        MPI_Finalize();
+        return 0;
+    }
+
     int sendCount = arr.size() / NumTasks;
     int lastSendCount = sendCount + arr.size() % (sendCount * NumTasks);
 
-    std::vector<int> sendCounts(NumTasks);
+    std::vector<int> sendCounts(NumTasks, sendCount);
+    sendCounts[NumTasks - 1] = lastSendCount;
     std::vector<int> disp(NumTasks);
-
-    for (int i = 0; i < NumTasks; i++)
-    {
-        if (i == (NumTasks - 1))
-            sendCounts[i] = lastSendCount;
-        else
-            sendCounts[i] = sendCount;
-    }
 
     for (int i = 1; i < NumTasks; i++)
         disp[i] = disp[i - 1] + sendCounts[i - 1];
@@ -72,7 +84,6 @@ int main(int argc, char **argv)
     {
         arrs[i].resize(sendCounts[i]);
     }
-    
 
     MPI_Scatterv(arr.data(), sendCounts.data(), disp.data(), MPI_UINT32_T, arrs[SelfTID].data(), sendCounts[SelfTID], MPI_UINT32_T, 0, MPI_COMM_WORLD);
 

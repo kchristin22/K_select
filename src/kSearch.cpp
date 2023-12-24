@@ -101,22 +101,6 @@ void kSearch(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, const si
 
     std::vector<uint32_t> array;
 
-    if (arr.size() * np < CACHE_SIZE / 2) // check if the array fits in a single machine
-    {
-        array.resize(arr.size() * np);
-        MPI_Gather(arr.data(), arr.size(), MPI_UINT32_T, array.data(), arr.size(), MPI_UINT32_T, 0, MPI_COMM_WORLD); // gather all the arrays in the master process
-
-        if (SelfTID != 0)
-            return;
-
-        proc = MPI_COMM_SELF; // the MPI Communicator contains only the master now
-    }
-    else
-    {
-        array.resize(arr.size());
-        array = std::move(arr);
-    }
-
     localData local;
     findLocalMinMax(local, array);
 

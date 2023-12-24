@@ -149,28 +149,8 @@ void heurQuickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, 
 
     MPI_Comm proc = MPI_COMM_WORLD;
 
-    std::vector<uint32_t> array;
-    bool gathered = false;
-
-    if (arr.size() * np < CACHE_SIZE / 2) // check if the array fits in a single machine
-    {
-        array.resize(arr.size() * np);
-        MPI_Gather(arr.data(), arr.size(), MPI_UINT32_T, array.data(), arr.size(), MPI_UINT32_T, 0, MPI_COMM_WORLD); // gather all the arrays in the master process
-
-        if (SelfTID != 0)
-            return;
-
-        proc = MPI_COMM_SELF; // the MPI Communicator contains only the master now
-        gathered = true;      // set flag to true to avoid re-gathering the array
-    }
-    else
-    {
-        array.resize(arr.size());
-        array = std::move(arr);
-    }
-
     localDataHeurQuick local;
-    findLocalMinMax(local, array);
+    findLocalMinMax(local, arr);
 
     uint32_t min = local.localMin, max = local.localMax;
 
@@ -200,8 +180,9 @@ void heurQuickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, 
                                    // and the min value as the previous pivot to calculate the median of the range
     uint32_t newP;
     uint32_t countSum = n, prevCountSum = 0;
-    uint32_t start = 0, end = array.size() - 1;
-    local.rightMargin = array.size() - 1;
+    uint32_t start = 0, end = arr.size() - 1;
+    local.rightMargin = arr.size() - 1;
+    bool gathered = false;
 
     while (true)
     {
@@ -221,7 +202,7 @@ void heurQuickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, 
         p = newP;
         prevCountSum = countSum;
 
-        heurParSorting(local, array, start, end, p); // find local count
+        heurParSorting(local, arr, start, end, p); // find local count
 
         MPI_Allreduce(&local.count, &countSum, 1, MPI_UINT32_T, MPI_SUM, proc); // also broadcasts the number of elements <= p so all processes can do calculations with it
 
@@ -270,20 +251,20 @@ void heurQuickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, 
                 disp[i] = disp[i - 1] + recvCount[i - 1];
 
             // use Gatherv to gather different amounts of data from each process
-            MPI_Gatherv(array.data(), local.count, MPI_UINT32_T, tempArr.data(), recvCount.data(), disp.data(), MPI_UINT32_T, 0, MPI_COMM_WORLD);
+            MPI_Gatherv(arr.data(), local.count, MPI_UINT32_T, tempArr.data(), recvCount.data(), disp.data(), MPI_UINT32_T, 0, MPI_COMM_WORLD);
 
             if (SelfTID != 0)
                 return;
 
-            array.resize(countSum);
-            array = std::move(tempArr); // we lose the local array here, we can copy it if we want to keep it but maybe both won't fit in memory
+            arr.resize(countSum);
+            arr = std::move(tempArr); // we lose the local array here, we can copy it if we want to keep it but maybe both won't fit in memory
 
             proc = MPI_COMM_SELF;
             gathered = true;
 
             // reset start and end
             start = 0;
-            end = array.size() - 1;
+            end = arr.size() - 1;
         }
     }
 
@@ -293,11 +274,11 @@ void heurQuickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, 
     uint32_t localDistance, distance;
 
     // make sure that start and end are inside the array
-    start %= array.size();
-    end %= array.size(); // end refers to an index inside the array (see localSorting)
+    start %= arr.size();
+    end %= arr.size(); // end refers to an index inside the array (see localSorting)
 
     // find local potential kth element
-    findClosest(localDistance, array, start, end, p, comp);
+    findClosest(localDistance, arr, start, end, p, comp);
 
     MPI_Allreduce(&localDistance, &distance, 1, MPI_UINT32_T, MPI_MIN, proc); // find the overall closest element to the pivot
                                                                               // that fullfills the condition imposed by the countSum-k relation

@@ -83,22 +83,6 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
     std::vector<uint32_t> array;
     bool gathered = false;
 
-    if (arr.size() * np < CACHE_SIZE / 2) // check if the array fits in a single machine
-    {
-        array.resize(arr.size() * np);
-        MPI_Gather(arr.data(), arr.size(), MPI_UINT32_T, array.data(), arr.size(), MPI_UINT32_T, 0, proc); // gather all the arrays in the master process
-
-        if (SelfTID != 0)
-            return;
-
-        proc = MPI_COMM_SELF; // the MPI Communicator contains only the master now
-        gathered = true;      // set flag to true to avoid re-gathering the array
-    }
-    else
-    {
-        array.resize(arr.size());
-        array = std::move(arr);
-    }
     MPI_Comm_size(proc, &NumTasks); // number of processes in the communicator
     MPI_Comm_rank(proc, &SelfTID);
 
@@ -206,14 +190,11 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
             else // both are smaller than k
                 kth = std::max(countSum, prevCountSum) == countSum ? prevP : prevPrevP;
 
-            MPI_Bcast(&kth, 1, MPI_UINT32_T, master, proc); // broadcast the kth element
-
             return;
         }
     }
 
-    kth = p;                                        // countSum == k
-    MPI_Bcast(&kth, 1, MPI_UINT32_T, master, proc); // broadcast the kth element
+    kth = p; // countSum == k
 
     return;
 }
