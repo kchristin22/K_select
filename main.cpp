@@ -1,5 +1,6 @@
 #include <iostream>
 #include <algorithm>
+#include <execution>
 #include <mpi.h>
 #include "kSearch.hpp"
 #include "heurQuickSelect.hpp"
@@ -23,24 +24,11 @@ int main(int argc, char **argv)
         return 0;
     }
     srand(time(NULL));
-    // printf("arr: ");
-    // arr = {8, 8, 8, 9, 9, 8, 2, 4};
-    // arr = {4, 4, 4, 2, 1, 2, 3, 2};
-    // arr = {1, 2, 3, 4, 5, 6, 7, 8};
-    // arr = {3, 1, 4, 2, 6, 10, 10, 9};
-    // arr = {10, 10, 3, 10, 10, 7, 5, 6};
-    // arr = {4, 1, 1, 4, 2, 5, 8, 4};
-    // arr = {4, 3, 5, 5, 5, 4, 1, 1};
-    // arr = {3, 10, 1, 10, 3, 7, 3, 9};
-    // arr = {9, 1, 2, 10, 7, 10, 7, 10};
-    // arr = {8, 8, 8, 8, 1, 1, 1, 1};
 
     for (size_t i = 0; i < arr.size(); i++)
     {
-        arr[i] = rand() % 10 + 1;
-        // printf("%d, ", arr[i]);
+        arr[i] = rand() % 100 + 1;
     }
-    // printf("\n");
 
     int NumTasks, SelfTID;
     int kth = 0;
@@ -49,6 +37,13 @@ int main(int argc, char **argv)
 
     MPI_Comm_size(MPI_COMM_WORLD, &NumTasks);
     MPI_Comm_rank(MPI_COMM_WORLD, &SelfTID);
+
+    if(SelfTID == 0){
+        std::vector<int> arrSort(ARRAY_SIZE);
+        arrSort = arr;
+        std::sort(std::execution::par_unseq, arrSort.begin(), arrSort.end());
+        printf("k correct: %d\n", arrSort[k - 1]);
+    }
 
     if (arr.size() < CACHE_SIZE) // check if the array fits in a single machine
     {
