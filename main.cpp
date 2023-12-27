@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <algorithm>
 #include <execution>
 #include <mpi.h>
@@ -6,28 +7,50 @@
 #include "heurQuickSelect.hpp"
 #include "quickSelect.hpp"
 
-#define k_default 4
-#define ARRAY_SIZE 1600
-
 int main(int argc, char **argv)
 {
-    size_t k;
-    if (argc == 2)
-        k = atoi(argv[1]);
-    else
-        k = k_default;
+    size_t k = 1;
+    std::ifstream file;
 
-    std::vector<int> arr(ARRAY_SIZE);
-    if (k > arr.size())
+    switch (argc)
     {
-        printf("k is out pt array range\n");
+    case 1:
+        std::cout << "No arguments provided\n The usage is mpirun -np x ./output input_vector.txt k" << std::endl;
+        return 0;
+    case 3:
+        k = atoll(argv[2]);
+    case 2:
+        file.open(argv[1]);
+        if (!file.is_open())
+        {
+            std::cout << "File not found" << std::endl;
+            return 0;
+        }
+        if (argc == 3)
+            break;
+        std::cout << "K is not specified provided, using default k = ARRAY_SIZE / 2" << std::endl;
+        break;
+    default:
+        std::cout << "Too many arguments provided" << std::endl;
         return 0;
     }
-    srand(time(NULL));
 
-    for (size_t i = 0; i < arr.size(); i++)
+    std::vector<int> arr;
+    int value;
+    while (file >> value)
     {
-        arr[i] = rand() % 100 + 1;
+        arr.push_back(value);
+    }
+
+    file.close();
+    size_t n = arr.size();
+
+    if (argc == 2)
+        k = n / 2;
+    else if (k > n)
+    {
+        printf("k is out of array range\n");
+        return 0;
     }
 
     int NumTasks, SelfTID;
@@ -38,11 +61,13 @@ int main(int argc, char **argv)
     MPI_Comm_size(MPI_COMM_WORLD, &NumTasks);
     MPI_Comm_rank(MPI_COMM_WORLD, &SelfTID);
 
-    if(SelfTID == 0){
-        std::vector<int> arrSort(ARRAY_SIZE);
+    if (SelfTID == 0)
+    {
+        printf("k = %ld\n", k);
+        std::vector<int> arrSort(n);
         arrSort = arr;
         std::sort(std::execution::par_unseq, arrSort.begin(), arrSort.end());
-        printf("k correct: %d\n", arrSort[k - 1]);
+        printf("kth correct: %d\n", arrSort[k - 1]);
     }
 
     if (arr.size() < CACHE_SIZE) // check if the array fits in a single machine
@@ -51,18 +76,18 @@ int main(int argc, char **argv)
 
         if (SelfTID == 0)
         {
-            std::vector<int> arr2(ARRAY_SIZE);
+            std::vector<int> arr2(n);
             arr2 = arr;
-            std::vector<int> arr3(ARRAY_SIZE);
+            std::vector<int> arr3(n);
             arr3 = arr;
 
-            kSearch(kth, arr, k, arr.size(), NumTasks);
+            kSearch(kth, arr, k, n, NumTasks);
             printf("kth element kSearch: %d\n", kth);
 
-            heurQuickSelect(kth, arr2, k, arr2.size(), NumTasks);
+            heurQuickSelect(kth, arr2, k, n, NumTasks);
             printf("kth element heur: %d\n", kth);
 
-            quickSelect(kth, arr3, k, arr3.size(), NumTasks);
+            quickSelect(kth, arr3, k, n, NumTasks);
             printf("kth element quick: %d\n", kth);
         }
 
@@ -73,8 +98,8 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    int sendCount = arr.size() / NumTasks;
-    int lastSendCount = sendCount + arr.size() % (sendCount * NumTasks);
+    int sendCount = n / NumTasks;
+    int lastSendCount = sendCount + n % (sendCount * NumTasks);
 
     std::vector<int> sendCounts(NumTasks, sendCount);
     sendCounts[NumTasks - 1] = lastSendCount;
@@ -91,26 +116,10 @@ int main(int argc, char **argv)
 
     MPI_Scatterv(arr.data(), sendCounts.data(), disp.data(), MPI_INT, arrs[SelfTID].data(), sendCounts[SelfTID], MPI_INT, 0, MPI_COMM_WORLD);
 
-    kSearch(kth, arrs[SelfTID], k, arr.size(), NumTasks);
+    kSearch(kth, arrs[SelfTID], k, n, NumTasks);
 
     if (SelfTID == 0)
-    {
-        switch (k)
-        {
-        case 1:
-            printf("1st element: %d\n", kth);
-            break;
-        case 2:
-            printf("2nd element: %d\n", kth);
-            break;
-        case 3:
-            printf("3rd element: %d\n", kth);
-            break;
-        default:
-            printf("%ldth element: %d\n", k, kth);
-            break;
-        }
-    }
+        printf("kth element kSearch: %d\n", kth);
 
     MPI_Barrier(MPI_COMM_WORLD); // no need for a single barrier request, using Barrier_init, here, the use of the barrier is out of scope of the program (not included in the timings)
 
@@ -123,10 +132,10 @@ int main(int argc, char **argv)
 
     MPI_Scatterv(arr.data(), sendCounts.data(), disp.data(), MPI_INT, arrs2[SelfTID].data(), lastSendCount, MPI_INT, 0, MPI_COMM_WORLD);
 
-    heurQuickSelect(kth, arrs2[SelfTID], k, arr.size(), NumTasks);
+    heurQuickSelect(kth, arrs2[SelfTID], k, n, NumTasks);
 
     if (SelfTID == 0)
-        printf("kth element heur: %d\n", kth);
+        printf("kth element heur quick: %d\n", kth);
 
     MPI_Barrier(MPI_COMM_WORLD);
 
@@ -139,7 +148,7 @@ int main(int argc, char **argv)
 
     MPI_Scatterv(arr.data(), sendCounts.data(), disp.data(), MPI_INT, arrs3[SelfTID].data(), lastSendCount, MPI_INT, 0, MPI_COMM_WORLD);
 
-    quickSelect(kth, arrs3[SelfTID], k, arr.size(), NumTasks);
+    quickSelect(kth, arrs3[SelfTID], k, n, NumTasks);
 
     if (SelfTID == 0)
         printf("kth element quick: %d\n", kth);

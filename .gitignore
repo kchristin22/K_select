@@ -33,3 +33,6 @@
 
 # CMake
 /build*/
+
+# Misc for testing
+*.txt
