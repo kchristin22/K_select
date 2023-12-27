@@ -3,9 +3,9 @@
 #include <omp.h>
 #include "quickSelect.hpp"
 
-void localSorting(localDataQuick &local, std::vector<uint32_t> &arr, const size_t start, const size_t end, const uint32_t p)
+void localSorting(localDataQuick &local, std::vector<int> &arr, const size_t start, const size_t end, const int p)
 {
-    uint32_t i = start, j = end;
+    size_t i = start, j = end;
     if (i > j) // in this implementation this signifies that the previous pivot was even smaller than the current one
     {
         local.count = i;
@@ -32,9 +32,9 @@ void localSorting(localDataQuick &local, std::vector<uint32_t> &arr, const size_
     return;
 }
 
-void parSorting(localDataQuick &local, std::vector<uint32_t> &arr, const size_t start, const size_t end, const uint32_t p)
+void parSorting(localDataQuick &local, std::vector<int> &arr, const size_t start, const size_t end, const int p)
 {
-    uint32_t i = start, j = end;
+    size_t i = start, j = end;
     if (i > j)
     {
         local.count = i;
@@ -68,13 +68,13 @@ void parSorting(localDataQuick &local, std::vector<uint32_t> &arr, const size_t 
     return;
 }
 
-void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, const size_t n, const size_t np)
+void quickSelect(int &kth, std::vector<int> &arr, const size_t k, const size_t n, const size_t np)
 {
     localDataQuick local;
-    uint32_t start = 0, end = arr.size() - 1;
+    size_t start = 0, end = arr.size() - 1;
     local.rightMargin = end;
-    uint32_t p = arr[(rand() % (end - start + 1)) + start], prevP = 0, prevPrevP = 0; // an alternation between pivots requires three pivot instances to be saved
-    uint32_t countSum = 0, prevCountSum = 0;
+    int p = arr[(rand() % (end - start + 1)) + start], prevP = 0, prevPrevP = 0; // an alternation between pivots requires three pivot instances to be saved
+    size_t countSum = 0, prevCountSum = 0;
     int NumTasks, SelfTID;
     int master = 0, previous = 0;
 
@@ -85,7 +85,7 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
     MPI_Comm_size(proc, &NumTasks); // number of processes in the communicator
     MPI_Comm_rank(proc, &SelfTID);
 
-    MPI_Bcast(&p, 1, MPI_UINT32_T, master, proc); // broadcast the pivot
+    MPI_Bcast(&p, 1, MPI_INT, master, proc); // broadcast the pivot
 
     while (true)
     {
@@ -95,7 +95,7 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
         prevP = p;
         prevCountSum = countSum;
 
-        MPI_Allreduce(&local.count, &countSum, 1, MPI_UINT32_T, MPI_SUM, proc); // also broadcasts the number of elements <= p so all processes can do calculations with it
+        MPI_Allreduce(&local.count, &countSum, 1, MPI_UNSIGNED_LONG, MPI_SUM, proc); // also broadcasts the number of elements <= p so all processes can do calculations with it
 
         if (countSum == k) // if countSum is equal to k, then the current pivot is the kth element
             break;
@@ -115,20 +115,20 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
         // gather the array if i) it is not gathered already, ii) the pivot is larger than the kth and iii) the size is small enough
         if (gathered == false && countSum > k && countSum < CACHE_SIZE / 2) // /2 to ensure that there's enough space to have two copies of the gathered array
         {
-            arr.erase(arr.begin(), arr.begin() + local.count); // remove the elements that are larger than the pivot, so there's enough space to gather the elements
-            std::vector<uint32_t> tempArr(countSum);           // store local array
+            arr.erase(arr.begin() + local.count + 1, arr.end()); // remove the elements that are larger than the pivot, so there's enough space to gather the elements
+            std::vector<int> tempArr(countSum);                  // store local array
             std::vector<int> recvCount(np);
             std::vector<int> disp(np, 0);
 
             // store the amount of data each process will send
-            MPI_Gather(&local.count, 1, MPI_INT, recvCount.data(), 1, MPI_UINT32_T, 0, proc);
+            MPI_Gather(&local.count, 1, MPI_UNSIGNED_LONG, recvCount.data(), 1, MPI_UNSIGNED_LONG, 0, proc);
 
             // calculate the displacement of each process' data
             for (size_t i = 1; i < np; i++)
                 disp[i] = disp[i - 1] + recvCount[i - 1];
 
             // use Gatherv to gather different amounts of data from each process
-            MPI_Gatherv(arr.data(), local.count, MPI_UINT32_T, tempArr.data(), recvCount.data(), disp.data(), MPI_UINT32_T, 0, proc);
+            MPI_Gatherv(arr.data(), local.count, MPI_INT, tempArr.data(), recvCount.data(), disp.data(), MPI_INT, 0, proc);
 
             if (SelfTID != 0)
                 return;
@@ -175,7 +175,7 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
             MPI_Bcast(&master, 1, MPI_INT, previous, proc); // broadcast new master
             if (master == previous)                         // the master has passed the tests
             {
-                MPI_Bcast(&p, 1, MPI_UINT32_T, master, proc); // broadcast new pivot
+                MPI_Bcast(&p, 1, MPI_INT, master, proc); // broadcast new pivot
                 break;
             }
             else
@@ -183,9 +183,9 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
         }
         if (p == prevPrevP || p == prevP) // only elements equal to the kth or the kth +1/-1 elements' values are left
         {
-            if (std::clamp((uint32_t)k, prevCountSum, countSum) == k || std::clamp((uint32_t)k, countSum, prevCountSum) == k) // k is between the two countSums
-                kth = prevCountSum < countSum ? prevP : prevPrevP;                                                            // prevCountSum corresponds to the prevPrevP
-            else if (countSum > k)                                                                                            // both are larger than k
+            if (std::clamp(k, prevCountSum, countSum) == k || std::clamp(k, countSum, prevCountSum) == k) // k is between the two countSums
+                kth = prevCountSum < countSum ? prevP : prevPrevP;                                        // prevCountSum corresponds to the prevPrevP
+            else if (countSum > k)                                                                        // both are larger than k
                 kth = std::min(countSum, prevCountSum) == countSum ? prevP : prevPrevP;
             else // both are smaller than k
                 kth = std::max(countSum, prevCountSum) == countSum ? prevP : prevPrevP;

@@ -3,30 +3,30 @@
 #include <omp.h>
 #include "heurQuickSelect.hpp"
 
-inline bool lessEqualThan(const uint32_t &a, const uint32_t &b)
+inline bool lessEqualThan(const int &a, const int &b)
 {
     return a <= b;
 }
 
-inline bool greaterEqualThan(const uint32_t &a, const uint32_t &b)
+inline bool greaterEqualThan(const int &a, const int &b)
 {
     return a >= b;
 }
 
-inline bool lessThan(const uint32_t &a, const uint32_t &b)
+inline bool lessThan(const int &a, const int &b)
 {
     return a < b;
 }
 
-inline bool greaterThan(const uint32_t &a, const uint32_t &b)
+inline bool greaterThan(const int &a, const int &b)
 {
     return a > b;
 }
 
-void findLocalMinMax(localDataHeurQuick &local, const std::vector<uint32_t> &arr)
+void findLocalMinMax(localDataHeurQuick &local, const std::vector<int> &arr)
 {
     // find local min
-    uint32_t localmin = arr[0];
+    int localmin = arr[0];
 
 #pragma omp parallel for reduction(min : localmin)
     for (size_t i = 1; i < arr.size(); i++)
@@ -40,7 +40,7 @@ void findLocalMinMax(localDataHeurQuick &local, const std::vector<uint32_t> &arr
     local.localMin = localmin;
 
     // find local max
-    uint32_t localmax = arr[0];
+    int localmax = arr[0];
 
 #pragma omp parallel for reduction(max : localmax)
     for (size_t i = 1; i < arr.size(); i++)
@@ -56,9 +56,9 @@ void findLocalMinMax(localDataHeurQuick &local, const std::vector<uint32_t> &arr
     return;
 }
 
-void heurlocalSorting(localDataHeurQuick &local, std::vector<uint32_t> &arr, const size_t start, const size_t end, const uint32_t p)
+void heurlocalSorting(localDataHeurQuick &local, std::vector<int> &arr, const size_t start, const size_t end, const int p)
 {
-    uint32_t i = start, j = end;
+    size_t i = start, j = end;
     if (i > j) // in this implementation this signifies that the previous pivot was even smaller than the current one
     {
         local.count = i;
@@ -81,9 +81,9 @@ void heurlocalSorting(localDataHeurQuick &local, std::vector<uint32_t> &arr, con
     return;
 }
 
-void heurParSorting(localDataHeurQuick &local, std::vector<uint32_t> &arr, const size_t start, const size_t end, const uint32_t p)
+void heurParSorting(localDataHeurQuick &local, std::vector<int> &arr, const size_t start, const size_t end, const int p)
 {
-    uint32_t i = start, j = end;
+    size_t i = start, j = end;
     if (i > j)
     {
         local.count = i;
@@ -117,7 +117,7 @@ void heurParSorting(localDataHeurQuick &local, std::vector<uint32_t> &arr, const
     return;
 }
 
-inline void setComp(bool (*&comp)(const uint32_t &, const uint32_t &), const size_t k, const uint32_t countSum)
+inline void setComp(bool (*&comp)(const int &, const int &), const size_t k, const size_t countSum)
 {
     if (countSum >= k)
         comp = lessEqualThan; // the next element less than or equal to the pivot is the kth element
@@ -127,7 +127,7 @@ inline void setComp(bool (*&comp)(const uint32_t &, const uint32_t &), const siz
     return;
 }
 
-void findClosest(uint32_t &distance, const std::vector<uint32_t> &arr, const size_t start, const size_t end, const uint32_t &p, bool (*comp)(const uint32_t &, const uint32_t &))
+void findClosest(uint32_t &distance, const std::vector<int> &arr, const size_t start, const size_t end, const int &p, bool (*comp)(const int &, const int &))
 {
     distance = INT_MAX; // if there is no element fulfilling the condition, return INT_MAX to increase its distance from the pivot
 #pragma omp parallel for reduction(min : distance)
@@ -142,7 +142,7 @@ void findClosest(uint32_t &distance, const std::vector<uint32_t> &arr, const siz
     return;
 }
 
-void heurQuickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, const size_t n, const size_t np)
+void heurQuickSelect(int &kth, std::vector<int> &arr, const size_t k, const size_t n, const size_t np)
 {
 
     MPI_Comm proc = np > 1 ? MPI_COMM_WORLD : MPI_COMM_SELF;
@@ -153,13 +153,13 @@ void heurQuickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, 
     localDataHeurQuick local;
     findLocalMinMax(local, arr);
 
-    uint32_t min = local.localMin, max = local.localMax;
+    int min = local.localMin, max = local.localMax;
 
     // reduce the local mins to find the overall min
-    MPI_Allreduce(&local.localMin, &min, 1, MPI_UINT32_T, MPI_MIN, proc);
+    MPI_Allreduce(&local.localMin, &min, 1, MPI_INT, MPI_MIN, proc);
 
     // reduce the local maxes to find the overall max
-    MPI_Allreduce(&local.localMax, &max, 1, MPI_UINT32_T, MPI_MAX, proc);
+    MPI_Allreduce(&local.localMax, &max, 1, MPI_INT, MPI_MAX, proc);
 
     if (min == max) // the array contains only one value
     {
@@ -177,11 +177,11 @@ void heurQuickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, 
         return;
     }
 
-    uint32_t p = max, prevP = min; // use the max value as the first pivot as we know the number of elements <= p for it,
-                                   // and the min value as the previous pivot to calculate the median of the range
-    uint32_t newP;
-    uint32_t countSum = n, prevCountSum = 0;
-    uint32_t start = 0, end = arr.size() - 1;
+    int p = max, prevP = min; // use the max value as the first pivot as we know the number of elements <= p for it,
+                              // and the min value as the previous pivot to calculate the median of the range
+    int newP;
+    size_t countSum = n, prevCountSum = 0;
+    size_t start = 0, end = arr.size() - 1;
     local.rightMargin = arr.size() - 1;
     bool gathered = np == 1 ? true : false; // already gathered prior to the call
 
@@ -191,10 +191,11 @@ void heurQuickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, 
             prevCountSum = (k > countSum && prevP > p) ? prevCountSum + 1 : prevCountSum - 1;
 
         // find new pivot through linear interpolation, and make sure it's not out of bounds
-        newP = (int)(p + ((k - countSum) * (prevP - p)) / (prevCountSum - countSum)) > 0 ? p + ((k - countSum) * (prevP - p)) / (prevCountSum - countSum) : min;
+        int fraction = (((int)k - countSum) * (prevP - p)) / ((int)prevCountSum - countSum);
+        newP = p + fraction < 0 ? min : p + fraction;
         if (newP > max)
             newP = max;
-        else if (newP == p)
+        if (newP == p)
             newP = (k > countSum) ? p + 1 : p - 1;
         else if (newP == prevP)
             newP = (k > prevCountSum) ? prevP + 1 : prevP - 1; // avoid looping between two pivots
@@ -205,7 +206,9 @@ void heurQuickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, 
 
         heurParSorting(local, arr, start, end, p); // find local count
 
-        MPI_Allreduce(&local.count, &countSum, 1, MPI_UINT32_T, MPI_SUM, proc); // also broadcasts the number of elements <= p so all processes can do calculations with it
+        MPI_Allreduce(&local.count, &countSum, 1, MPI_UNSIGNED_LONG, MPI_SUM, proc); // also broadcasts the number of elements <= p so all processes can do calculations with it
+
+        // printf("p: %d, prevP: %d, prevCountSum: %ld, countSum: %ld\n", p, prevP, prevCountSum, countSum);
 
         if (countSum >= k)
         {
@@ -240,20 +243,20 @@ void heurQuickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, 
         // gather the array if i) it is not gathered already, ii) the pivot is larger than the kth and iii) the size is small enough
         if (gathered == false && countSum > k && countSum < CACHE_SIZE / 2) // /2 to ensure that there's enough space to have two copies of the gathered array
         {
-            arr.erase(arr.begin(), arr.begin() + local.count); // remove the elements that are larger than the pivot, so there's enough space to gather the elements
-            std::vector<uint32_t> tempArr(countSum);           // store local array
+            arr.erase(arr.begin() + local.count + 1, arr.end()); // remove the elements that are larger than the pivot, so there's enough space to gather the elements
+            std::vector<int> tempArr(countSum);                  // store local array
             std::vector<int> recvCount(np);
             std::vector<int> disp(np, 0);
 
             // store the amount of data each process will send
-            MPI_Gather(&local.count, 1, MPI_INT, recvCount.data(), 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
+            MPI_Gather(&local.count, 1, MPI_UNSIGNED_LONG, recvCount.data(), 1, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
 
             // calculate the displacement of each process' data
             for (size_t i = 1; i < np; i++)
                 disp[i] = disp[i - 1] + recvCount[i - 1];
 
             // use Gatherv to gather different amounts of data from each process
-            MPI_Gatherv(arr.data(), local.count, MPI_UINT32_T, tempArr.data(), recvCount.data(), disp.data(), MPI_UINT32_T, 0, MPI_COMM_WORLD);
+            MPI_Gatherv(arr.data(), local.count, MPI_INT, tempArr.data(), recvCount.data(), disp.data(), MPI_INT, 0, MPI_COMM_WORLD);
 
             if (SelfTID != 0)
                 return;
@@ -270,7 +273,7 @@ void heurQuickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, 
         }
     }
 
-    bool (*comp)(const uint32_t &, const uint32_t &);
+    bool (*comp)(const int &, const int &);
     setComp(comp, k, countSum); // set comp based on countSum and k's relation
 
     uint32_t localDistance, distance;
