@@ -228,15 +228,16 @@ void heurQuickSelect(int &kth, std::vector<int> &arr, const size_t k, const size
 
         if (abs(prevP - p) == 1) // check for the case where there are multiple instances of some values and the pivot alternates between them
         {
-            // find the closest element to the pivot with the largest count of the two
+            // if two consequential pivots showcase great difference in countSum, then the largest is surely in the array and is the kth element
             if (prevCountSum < countSum && k > prevCountSum && k < countSum)
-                break;
-
+            {
+                kth = p;
+                return;
+            }
             else if (prevCountSum > countSum && k < prevCountSum && k > countSum)
             {
-                p = prevP;
-                countSum = prevCountSum;
-                break;
+                kth = prevP;
+                return;
             }
         }
 

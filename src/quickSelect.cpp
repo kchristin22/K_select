@@ -184,10 +184,10 @@ void quickSelect(int &kth, std::vector<int> &arr, const size_t k, const size_t n
         if (p == prevPrevP || p == prevP) // only elements equal to the kth or the kth +1/-1 elements' values are left
         {
             if (std::clamp(k, prevCountSum, countSum) == k || std::clamp(k, countSum, prevCountSum) == k) // k is between the two countSums
-                kth = prevCountSum < countSum ? prevP : prevPrevP;                                        // prevCountSum corresponds to the prevPrevP
-            else if (countSum > k)                                                                        // both are larger than k
-                kth = std::min(countSum, prevCountSum) == countSum ? prevP : prevPrevP;
-            else // both are smaller than k
+                kth = std::max(prevP, prevPrevP);                                                         // the max value from the two is chosen
+            else if (countSum > k)                                                                        // both counts are larger than k
+                kth = std::min(countSum, prevCountSum) == countSum ? prevP : prevPrevP;                   // prevCountSum corresponds to the prevPrevP
+            else                                                                                          // both are smaller than k
                 kth = std::max(countSum, prevCountSum) == countSum ? prevP : prevPrevP;
 
             return;
