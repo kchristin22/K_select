@@ -10,8 +10,8 @@
 /* Struct to store local process' data */
 struct localDataQuick
 {
-    int localMin;
-    int localMax;
+    uint32_t localMin;
+    uint32_t localMax;
     size_t count = 0;
     size_t leftMargin = 0;
     size_t rightMargin = 0;
@@ -25,10 +25,10 @@ struct localDataQuick
  *      end (input): the last index of the array to search to
  *      p (input): the pivot
  */
-void localSorting(localDataQuick &local, std::vector<int> &arr, const size_t start, const size_t end, const int p);
+void localSorting(localDataQuick &local, std::vector<uint32_t> &arr, const size_t start, const size_t end, const uint32_t p);
 
 /* The parallel version of localSorting */
-void parSorting(localDataQuick &local, std::vector<int> &arr, const size_t start, const size_t end, const int p);
+void parSorting(localDataQuick &local, std::vector<uint32_t> &arr, const size_t start, const size_t end, const uint32_t p);
 
 /* Find the kth element of the array
  * @param:
@@ -38,4 +38,4 @@ void parSorting(localDataQuick &local, std::vector<int> &arr, const size_t start
  *      n (input): the size of the whole array
  *      np (input): the number of processes in the MPI communicator
  */
-void quickSelect(int &kth, std::vector<int> &arr, const size_t k, const size_t n, const size_t np);
+void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, const size_t n, const size_t np);

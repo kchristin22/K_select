@@ -3,7 +3,7 @@
 #include <omp.h>
 #include "quickSelect.hpp"
 
-void localSorting(localDataQuick &local, std::vector<int> &arr, const size_t start, const size_t end, const int p)
+void localSorting(localDataQuick &local, std::vector<uint32_t> &arr, const size_t start, const size_t end, const uint32_t p)
 {
     size_t i = start, j = end;
     if (i > j) // in this implementation this signifies that the previous pivot was even smaller than the current one
@@ -32,7 +32,7 @@ void localSorting(localDataQuick &local, std::vector<int> &arr, const size_t sta
     return;
 }
 
-void parSorting(localDataQuick &local, std::vector<int> &arr, const size_t start, const size_t end, const int p)
+void parSorting(localDataQuick &local, std::vector<uint32_t> &arr, const size_t start, const size_t end, const uint32_t p)
 {
     size_t i = start, j = end;
     if (i > j)
@@ -68,12 +68,12 @@ void parSorting(localDataQuick &local, std::vector<int> &arr, const size_t start
     return;
 }
 
-void quickSelect(int &kth, std::vector<int> &arr, const size_t k, const size_t n, const size_t np)
+void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, const size_t n, const size_t np)
 {
     localDataQuick local;
     size_t start = 0, end = arr.size() - 1;
     local.rightMargin = end;
-    int p = arr[(rand() % (end - start + 1)) + start], prevP = 0, prevPrevP = 0; // an alternation between pivots requires three pivot instances to be saved
+    uint32_t p = arr[(rand() % (end - start + 1)) + start], prevP = 0, prevPrevP = 0; // an alternation between pivots requires three pivot instances to be saved
     size_t countSum = 0, prevCountSum = 0;
     int NumTasks, SelfTID;
     int master = 0, previous = 0;
@@ -85,7 +85,7 @@ void quickSelect(int &kth, std::vector<int> &arr, const size_t k, const size_t n
     MPI_Comm_size(proc, &NumTasks); // number of processes in the communicator
     MPI_Comm_rank(proc, &SelfTID);
 
-    MPI_Bcast(&p, 1, MPI_INT, master, proc); // broadcast the pivot
+    MPI_Bcast(&p, 1, MPI_UINT32_T, master, proc); // broadcast the pivot
 
     while (true)
     {
@@ -116,19 +116,19 @@ void quickSelect(int &kth, std::vector<int> &arr, const size_t k, const size_t n
         if (gathered == false && countSum > k && countSum < CACHE_SIZE / 2) // /2 to ensure that there's enough space to have two copies of the gathered array
         {
             arr.erase(arr.begin() + local.count + 1, arr.end()); // remove the elements that are larger than the pivot, so there's enough space to gather the elements
-            std::vector<int> tempArr(countSum);                  // store local array
+            std::vector<uint32_t> tempArr(countSum);                  // store local array
             std::vector<int> recvCount(np);
             std::vector<int> disp(np, 0);
 
             // store the amount of data each process will send
-            MPI_Gather(&local.count, 1, MPI_UNSIGNED_LONG, recvCount.data(), 1, MPI_UNSIGNED_LONG, 0, proc);
+            MPI_Gather(&local.count, 1, MPI_INT, recvCount.data(), 1, MPI_INT, 0, proc);
 
             // calculate the displacement of each process' data
             for (size_t i = 1; i < np; i++)
                 disp[i] = disp[i - 1] + recvCount[i - 1];
 
             // use Gatherv to gather different amounts of data from each process
-            MPI_Gatherv(arr.data(), local.count, MPI_INT, tempArr.data(), recvCount.data(), disp.data(), MPI_INT, 0, proc);
+            MPI_Gatherv(arr.data(), local.count, MPI_UINT32_T, tempArr.data(), recvCount.data(), disp.data(), MPI_UINT32_T, 0, proc);
 
             if (SelfTID != 0)
                 return;
@@ -175,7 +175,7 @@ void quickSelect(int &kth, std::vector<int> &arr, const size_t k, const size_t n
             MPI_Bcast(&master, 1, MPI_INT, previous, proc); // broadcast new master
             if (master == previous)                         // the master has passed the tests
             {
-                MPI_Bcast(&p, 1, MPI_INT, master, proc); // broadcast new pivot
+                MPI_Bcast(&p, 1, MPI_UINT32_T, master, proc); // broadcast new pivot
                 break;
             }
             else
