@@ -112,23 +112,37 @@ int main(int argc, char **argv)
         disp[i] = disp[i - 1] + sendCounts[i - 1];
 
     std::vector<std::vector<uint32_t>> arrs(NumTasks);
-    for (int i = 0; i < NumTasks; i++)
-    {
-        arrs[i].resize(sendCounts[i]);
-    }
-
-    MPI_Scatterv(arr.data(), sendCounts.data(), disp.data(), MPI_UINT32_T, arrs[SelfTID].data(), sendCounts[SelfTID], MPI_UINT32_T, 0, MPI_COMM_WORLD);
 
     if (SelfTID == 0)
     {
+        std::fstream file("kSearch.json", std::ios::out);
+
         ankerl::nanobench::Bench()
-            .minEpochIterations(1)
-            .epochs(1)
+            .minEpochIterations(10)
+            .epochs(3)
             .run("kSearch", [&]
-                 { kSearch(kth, arrs[SelfTID], k, arr.size(), NumTasks); });
+                 { for (int i = 0; i < NumTasks; i++)
+                    {
+                        arrs[i].resize(sendCounts[i]);
+                    }
+                    MPI_Scatterv(arr.data(), sendCounts.data(), disp.data(), MPI_UINT32_T, arrs[SelfTID].data(), sendCounts[SelfTID], MPI_UINT32_T, 0, MPI_COMM_WORLD);
+                    kSearch(kth, arrs[SelfTID], k, arr.size(), NumTasks); })
+            .render(ankerl::nanobench::templates::pyperf(), file);
     }
     else
-        kSearch(kth, arrs[SelfTID], k, arr.size(), NumTasks);
+    {
+        ankerl::nanobench::Bench()
+            .minEpochIterations(10)
+            .epochs(3)
+            .output(nullptr)
+            .run("kSearch", [&]
+                 { for (int i = 0; i < NumTasks; i++)
+                    {
+                        arrs[i].resize(sendCounts[i]);
+                    }
+                    MPI_Scatterv(arr.data(), sendCounts.data(), disp.data(), MPI_UINT32_T, arrs[SelfTID].data(), sendCounts[SelfTID], MPI_UINT32_T, 0, MPI_COMM_WORLD);
+                    kSearch(kth, arrs[SelfTID], k, arr.size(), NumTasks); });
+    }
 
     if (SelfTID == 0)
         printf("kth element kSearch: %u\n", kth);
@@ -137,23 +151,36 @@ int main(int argc, char **argv)
 
     std::vector<std::vector<uint32_t>> arrs2(NumTasks);
 
-    for (int i = 0; i < NumTasks; i++)
-    {
-        arrs2[i].resize(sendCounts[i]);
-    }
-
-    MPI_Scatterv(arr.data(), sendCounts.data(), disp.data(), MPI_UINT32_T, arrs2[SelfTID].data(), lastSendCount, MPI_UINT32_T, 0, MPI_COMM_WORLD);
-
     if (SelfTID == 0)
     {
+        std::fstream file("heurQuick.json", std::ios::out);
+
         ankerl::nanobench::Bench()
-            .minEpochIterations(1)
-            .epochs(1)
+            .minEpochIterations(10)
+            .epochs(3)
             .run("heurQuickSelect", [&]
-                 { heurQuickSelect(kth, arrs2[SelfTID], k, arr.size(), NumTasks); });
+                 { for (int i = 0; i < NumTasks; i++)
+                    {
+                        arrs2[i].resize(sendCounts[i]);
+                    }
+                    MPI_Scatterv(arr.data(), sendCounts.data(), disp.data(), MPI_UINT32_T, arrs2[SelfTID].data(), lastSendCount, MPI_UINT32_T, 0, MPI_COMM_WORLD);
+                    heurQuickSelect(kth, arrs2[SelfTID], k, arr.size(), NumTasks); })
+            .render(ankerl::nanobench::templates::pyperf(), file);
     }
     else
-        heurQuickSelect(kth, arrs2[SelfTID], k, arr.size(), NumTasks);
+    {
+        ankerl::nanobench::Bench()
+            .minEpochIterations(10)
+            .epochs(3)
+            .output(nullptr)
+            .run("heurQuickSelect", [&]
+                 { for (int i = 0; i < NumTasks; i++)
+                    {
+                        arrs2[i].resize(sendCounts[i]);
+                    }
+                    MPI_Scatterv(arr.data(), sendCounts.data(), disp.data(), MPI_UINT32_T, arrs2[SelfTID].data(), lastSendCount, MPI_UINT32_T, 0, MPI_COMM_WORLD);
+                    heurQuickSelect(kth, arrs2[SelfTID], k, arr.size(), NumTasks); });
+    }
 
     if (SelfTID == 0)
         printf("kth element heur quick: %u\n", kth);
@@ -167,18 +194,36 @@ int main(int argc, char **argv)
         arrs3[i].resize(sendCounts[i]);
     }
 
-    MPI_Scatterv(arr.data(), sendCounts.data(), disp.data(), MPI_UINT32_T, arrs3[SelfTID].data(), lastSendCount, MPI_UINT32_T, 0, MPI_COMM_WORLD);
-
     if (SelfTID == 0)
     {
+        std::fstream file("quick.json", std::ios::out);
+
         ankerl::nanobench::Bench()
-            .minEpochIterations(1)
-            .epochs(1)
+            .minEpochIterations(10)
+            .epochs(3)
             .run("quickSelect", [&]
-                 { quickSelect(kth, arrs3[SelfTID], k, arr.size(), NumTasks); });
+                 { for (int i = 0; i < NumTasks; i++)
+                    {
+                        arrs3[i].resize(sendCounts[i]);
+                    }
+                    MPI_Scatterv(arr.data(), sendCounts.data(), disp.data(), MPI_UINT32_T, arrs3[SelfTID].data(), lastSendCount, MPI_UINT32_T, 0, MPI_COMM_WORLD); 
+                    quickSelect(kth, arrs3[SelfTID], k, arr.size(), NumTasks); })
+            .render(ankerl::nanobench::templates::pyperf(), file);
     }
     else
-        quickSelect(kth, arrs3[SelfTID], k, arr.size(), NumTasks);
+    {
+        ankerl::nanobench::Bench()
+            .minEpochIterations(10)
+            .epochs(3)
+            .output(nullptr)
+            .run("quickSelect", [&]
+                 { for (int i = 0; i < NumTasks; i++)
+                    {
+                        arrs3[i].resize(sendCounts[i]);
+                    }
+                    MPI_Scatterv(arr.data(), sendCounts.data(), disp.data(), MPI_UINT32_T, arrs3[SelfTID].data(), lastSendCount, MPI_UINT32_T, 0, MPI_COMM_WORLD);
+                    quickSelect(kth, arrs3[SelfTID], k, arr.size(), NumTasks); });
+    }
 
     if (SelfTID == 0)
         printf("kth element quick: %u\n", kth);
