@@ -132,6 +132,7 @@ void kSearch(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, const si
     uint32_t newP;
     size_t countSumLess = n, prevCountSumLess = 0;
     bool (*comp)(const uint32_t &, const uint32_t &) = (k < n / 2) ? lessEqualThan : greaterThan; // optimize the number of elements to count based on k's position
+    bool gathered = np == 1 ? true : false;                                                       // already gathered prior to the call
 
     while (true)
     {
@@ -180,6 +181,33 @@ void kSearch(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, const si
         else if (countSumLess > k)
             std::erase_if(arr, [p](uint32_t x)
                           { return x > p; }); // if countSum is bigger than k, then the kth element is smaller than the pivot
+
+        if (gathered == false && countSumLess > k && countSumLess < CACHE_SIZE / 2) // /2 to ensure that there's enough space to have two copies of the gathered array
+        {
+            arr.erase(arr.begin() + local.count + 1, arr.end()); // remove the elements that are larger than the pivot, so there's enough space to gather the elements
+            std::vector<uint32_t> tempArr(countSumLess);             // store local array
+            std::vector<int> recvCount(np);
+            std::vector<int> disp(np, 0);
+
+            // store the amount of data each process will send
+            MPI_Gather(&local.count, 1, MPI_INT, recvCount.data(), 1, MPI_INT, 0, proc);
+
+            // calculate the displacement of each process' data
+            for (size_t i = 1; i < np; i++)
+                disp[i] = disp[i - 1] + recvCount[i - 1];
+
+            // use Gatherv to gather different amounts of data from each process
+            MPI_Gatherv(arr.data(), local.count, MPI_UINT32_T, tempArr.data(), recvCount.data(), disp.data(), MPI_UINT32_T, 0, proc);
+
+            if (SelfTID != 0)
+                return;
+
+            arr.resize(countSumLess);
+            arr = std::move(tempArr); // we lose the local array here, we can copy it if we want to keep it but maybe both won't fit in memory
+
+            proc = MPI_COMM_SELF;
+            gathered = true;
+        }
     }
 
     if ((countSumLess >= k))

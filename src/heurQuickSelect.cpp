@@ -1,5 +1,4 @@
 #include <limits.h>
-#include <inttypes.h>
 #include <mpi.h>
 #include <omp.h>
 #include "heurQuickSelect.hpp"
