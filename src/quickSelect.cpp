@@ -116,7 +116,7 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
         if (gathered == false && countSum > k && countSum < CACHE_SIZE / 2) // /2 to ensure that there's enough space to have two copies of the gathered array
         {
             arr.erase(arr.begin() + local.count + 1, arr.end()); // remove the elements that are larger than the pivot, so there's enough space to gather the elements
-            std::vector<uint32_t> tempArr(countSum);                  // store local array
+            std::vector<uint32_t> tempArr(countSum);             // store local array
             std::vector<int> recvCount(np);
             std::vector<int> disp(np, 0);
 
@@ -183,12 +183,12 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
         }
         if (p == prevPrevP || p == prevP) // only elements equal to the kth or the kth +1/-1 elements' values are left
         {
-            if (std::clamp(k, prevCountSum, countSum) == k || std::clamp(k, countSum, prevCountSum) == k) // k is between the two countSums
+            if (std::clamp(k, prevCountSum, countSum) == k || std::clamp(k, countSum, prevCountSum) == k) // k is between the two countSums (prevCountSum corresponds to the prevPrevP)
                 kth = std::max(prevP, prevPrevP);                                                         // the max value from the two is chosen
             else if (countSum > k)                                                                        // both counts are larger than k
-                kth = std::min(countSum, prevCountSum) == countSum ? prevP : prevPrevP;                   // prevCountSum corresponds to the prevPrevP
+                kth = std::min(prevP, prevPrevP);                                                         // smallest pivot value corresponds to smallest countSum
             else                                                                                          // both are smaller than k
-                kth = std::max(countSum, prevCountSum) == countSum ? prevP : prevPrevP;
+                kth = std::max(prevP, prevPrevP);
 
             return;
         }
