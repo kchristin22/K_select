@@ -8,16 +8,6 @@ inline bool lessEqualThan(const uint32_t &a, const uint32_t &b)
     return a <= b;
 }
 
-inline bool greaterEqualThan(const uint32_t &a, const uint32_t &b)
-{
-    return a >= b;
-}
-
-inline bool lessThan(const uint32_t &a, const uint32_t &b)
-{
-    return a < b;
-}
-
 inline bool greaterThan(const uint32_t &a, const uint32_t &b)
 {
     return a > b;
@@ -28,7 +18,8 @@ void findLocalMinMax(localDataHeurQuick &local, const std::vector<uint32_t> &arr
     // find local min
     uint32_t localmin = arr[0];
 
-#pragma omp parallel for reduction(min : localmin)
+#pragma omp parallel
+#pragma omp for nowait reduction(min : localmin)
     for (size_t i = 1; i < arr.size(); i++)
     {
         if (arr[i] < localmin)
@@ -42,7 +33,8 @@ void findLocalMinMax(localDataHeurQuick &local, const std::vector<uint32_t> &arr
     // find local max
     uint32_t localmax = arr[0];
 
-#pragma omp parallel for reduction(max : localmax)
+#pragma omp parallel
+#pragma omp for nowait reduction(max : localmax)
     for (size_t i = 1; i < arr.size(); i++)
     {
         if (arr[i] > localmax)

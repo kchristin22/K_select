@@ -8,11 +8,6 @@ inline bool lessEqualThan(const uint32_t &a, const uint32_t &b)
     return a <= b;
 }
 
-inline bool lessThan(const uint32_t &a, const uint32_t &b)
-{
-    return a < b;
-}
-
 inline bool greaterThan(const uint32_t &a, const uint32_t &b)
 {
     return a > b;
@@ -23,7 +18,8 @@ void findLocalMinMax(localData &local, const std::vector<uint32_t> &arr)
     // find local min
     uint32_t localmin = arr[0];
 
-#pragma omp parallel for reduction(min : localmin)
+#pragma omp parallel
+#pragma omp for nowait reduction(min : localmin)
     for (size_t i = 1; i < arr.size(); i++)
     {
         if (arr[i] < localmin)
@@ -37,7 +33,8 @@ void findLocalMinMax(localData &local, const std::vector<uint32_t> &arr)
     // find local max
     uint32_t localmax = arr[0];
 
-#pragma omp parallel for reduction(max : localmax)
+#pragma omp parallel
+#pragma omp for nowait reduction(max : localmax)
     for (size_t i = 1; i < arr.size(); i++)
     {
         if (arr[i] > localmax)
@@ -61,7 +58,8 @@ inline void findLocalCount(localData &local, const std::vector<uint32_t> &arr, c
         local.count = arr.size(); // all elements are less than or equal to the pivot
     else
     {
-#pragma omp parallel for reduction(+ : count)
+#pragma omp parallel
+#pragma omp for nowait reduction(+ : count)
         for (size_t i = 0; i < arr.size(); i++)
         {
             if (comp(arr[i], p)) // count the elements that are less than or equal to the pivot in case of k < n/2, or greater than the pivot in case of k >= n/2
@@ -80,7 +78,8 @@ inline void findLocalCount(localData &local, const std::vector<uint32_t> &arr, c
 void findClosest(uint32_t &distance, const std::vector<uint32_t> &arr, const uint32_t &p, bool (*comp)(const uint32_t &, const uint32_t &))
 {
     distance = UINT_MAX; // if there is no element fulfilling the condition, return INT_MAX to increase its distance from the pivot
-#pragma omp parallel for reduction(min : distance)
+#pragma omp parallel
+#pragma omp for nowait reduction(min : distance)
     for (size_t i = 0; i < arr.size(); i++)
     {
         if (comp(arr[i], p))
@@ -185,7 +184,7 @@ void kSearch(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, const si
         if (gathered == false && countSumLess > k && countSumLess < CACHE_SIZE / 2) // /2 to ensure that there's enough space to have two copies of the gathered array
         {
             arr.erase(arr.begin() + local.count + 1, arr.end()); // remove the elements that are larger than the pivot, so there's enough space to gather the elements
-            std::vector<uint32_t> tempArr(countSumLess);             // store local array
+            std::vector<uint32_t> tempArr(countSumLess);         // store local array
             std::vector<int> recvCount(np);
             std::vector<int> disp(np, 0);
 
