@@ -7,6 +7,9 @@
 #include "heurQuickSelect.hpp"
 #include "quickSelect.hpp"
 
+#define ANKERL_NANOBENCH_IMPLEMENT
+#include "nanobench.h"
+
 int main(int argc, char **argv)
 {
     size_t k = 1;
@@ -116,7 +119,16 @@ int main(int argc, char **argv)
 
     MPI_Scatterv(arr.data(), sendCounts.data(), disp.data(), MPI_UINT32_T, arrs[SelfTID].data(), sendCounts[SelfTID], MPI_UINT32_T, 0, MPI_COMM_WORLD);
 
-    kSearch(kth, arrs[SelfTID], k, n, NumTasks);
+    if (SelfTID == 0)
+    {
+        ankerl::nanobench::Bench()
+            .minEpochIterations(1)
+            .epochs(1)
+            .run("kSearch", [&]
+                 { kSearch(kth, arrs[SelfTID], k, arr.size(), NumTasks); });
+    }
+    else
+        kSearch(kth, arrs[SelfTID], k, arr.size(), NumTasks);
 
     if (SelfTID == 0)
         printf("kth element kSearch: %u\n", kth);
@@ -132,7 +144,16 @@ int main(int argc, char **argv)
 
     MPI_Scatterv(arr.data(), sendCounts.data(), disp.data(), MPI_UINT32_T, arrs2[SelfTID].data(), lastSendCount, MPI_UINT32_T, 0, MPI_COMM_WORLD);
 
-    heurQuickSelect(kth, arrs2[SelfTID], k, n, NumTasks);
+    if (SelfTID == 0)
+    {
+        ankerl::nanobench::Bench()
+            .minEpochIterations(1)
+            .epochs(1)
+            .run("heurQuickSelect", [&]
+                 { heurQuickSelect(kth, arrs2[SelfTID], k, arr.size(), NumTasks); });
+    }
+    else
+        heurQuickSelect(kth, arrs2[SelfTID], k, arr.size(), NumTasks);
 
     if (SelfTID == 0)
         printf("kth element heur quick: %u\n", kth);
@@ -148,7 +169,16 @@ int main(int argc, char **argv)
 
     MPI_Scatterv(arr.data(), sendCounts.data(), disp.data(), MPI_UINT32_T, arrs3[SelfTID].data(), lastSendCount, MPI_UINT32_T, 0, MPI_COMM_WORLD);
 
-    quickSelect(kth, arrs3[SelfTID], k, n, NumTasks);
+    if (SelfTID == 0)
+    {
+        ankerl::nanobench::Bench()
+            .minEpochIterations(1)
+            .epochs(1)
+            .run("quickSelect", [&]
+                 { quickSelect(kth, arrs3[SelfTID], k, arr.size(), NumTasks); });
+    }
+    else
+        quickSelect(kth, arrs3[SelfTID], k, arr.size(), NumTasks);
 
     if (SelfTID == 0)
         printf("kth element quick: %u\n", kth);
