@@ -11,42 +11,34 @@
 #define ANKERL_NANOBENCH_IMPLEMENT
 #include "nanobench.h"
 
+#define URL_DEFAULT (char *)"https://dumps.wikimedia.org/other/static_html_dumps/current/el/wikipedia-el-html.tar.7z"
+
 int main(int argc, char **argv)
 {
     size_t k = 1;
-    std::ifstream file;
+    char *url = NULL;
 
     switch (argc)
     {
     case 1:
-        std::cout << "No arguments provided\n The usage is mpirun -np x ./output input_vector.txt k" << std::endl;
-        return 0;
-    case 3:
-        k = atoll(argv[2]);
+        std::cout << "No arguments provided\n The usage is mpirun -np x ./output ${k} ${url}" << std::endl;
+        std::cout << "Using default url: " << URL_DEFAULT << std::endl;
+        url = URL_DEFAULT;
+        std::cout << "Using default k = ARRAY_SIZE / 2" << std::endl;
+        break;
     case 2:
-        file.open(argv[1]);
-        if (!file.is_open())
-        {
-            std::cout << "File not found" << std::endl;
-            return 0;
-        }
-        if (argc == 3)
-            break;
-        std::cout << "K is not specified provided, using default k = ARRAY_SIZE / 2" << std::endl;
+        k = atoll(argv[1]);
+        std::cout << "Using default url: " << URL_DEFAULT << std::endl;
+        url = URL_DEFAULT;
+        break;
+    case 3:
+        url = argv[2];
+        k = atoll(argv[1]);
         break;
     default:
         std::cout << "Too many arguments provided" << std::endl;
         return 0;
     }
-
-    // std::vector<uint32_t> arr;
-    // uint32_t value;
-    // while (file >> value)
-    // {
-    //     arr.push_back(value);
-    // }
-
-    // file.close();
 
     int NumTasks, SelfTID;
     uint32_t kth = 0;
@@ -57,19 +49,10 @@ int main(int argc, char **argv)
     MPI_Comm_size(MPI_COMM_WORLD, &NumTasks);
     MPI_Comm_rank(MPI_COMM_WORLD, &SelfTID);
 
-    int world_size = NumTasks;
-    int world_rank = SelfTID;
-    const char *url = "https://dumps.wikimedia.org/other/static_html_dumps/current/el/wikipedia-el-html.tar.7z";
+    CURL *curl_handle = NULL;
+    n = getWikiInfo(url, curl_handle) / sizeof(uint32_t);
 
-    ARRAY result = getWikiPartition(url, world_rank, world_size);
-    printf("Result size: %zu\n", result.size);
-
-    std::vector<uint32_t> arr(result.data, result.data + result.size);
-    free(result.data);
-
-    n = arr.size();
-
-    if (argc == 2)
+    if (argc == 1)
         k = n / 2;
     else if (k > n)
     {
@@ -77,36 +60,47 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    if (SelfTID == 0)
-    {
-        printf("k = %ld\n", k);
-        std::vector<uint32_t> arrSort(n);
-        arrSort = arr;
-        std::sort(std::execution::par_unseq, arrSort.begin(), arrSort.end());
-        printf("kth correct: %u\n", arrSort[k - 1]);
-    }
-    MPI_Barrier(MPI_COMM_WORLD);
-    exit(0);
+    // if (SelfTID == 0)
+    // {
+    //     printf("k = %ld\n", k);
+    //     std::vector<uint32_t> arrSort(n);
+    //     arrSort = arr;
+    //     std::sort(std::execution::par_unseq, arrSort.begin(), arrSort.end());
+    //     printf("kth correct: %u\n", arrSort[k - 1]);
+    // }
 
-    if (arr.size() < CACHE_SIZE) // check if the array fits in a single machine
+    if (n < CACHE_SIZE) // check if the array fits in a single machine
     {
         NumTasks = 1;
 
         if (SelfTID == 0)
         {
-            std::vector<uint32_t> arr2(n);
-            arr2 = arr;
-            std::vector<uint32_t> arr3(n);
-            arr3 = arr;
+            ARRAY result = getWikiPartition(url, SelfTID, NumTasks);
+            std::vector<uint32_t> arr(result.size);
+            memmove(arr.data(), result.data, result.size * sizeof(uint32_t));
+            free(result.data);
 
             kSearch(kth, arr, k, n, NumTasks);
             printf("kth element kSearch: %u\n", kth);
+            free(arr.data());
 
-            heurQuickSelect(kth, arr2, k, n, NumTasks);
+            arr.resize(n);
+            result = getWikiPartition(url, SelfTID, NumTasks);
+            memmove(arr.data(), result.data, result.size * sizeof(uint32_t));
+            free(result.data);
+
+            heurQuickSelect(kth, arr, k, n, NumTasks);
             printf("kth element heur: %u\n", kth);
+            free(arr.data());
 
-            quickSelect(kth, arr3, k, n, NumTasks);
+            arr.resize(n);
+            result = getWikiPartition(url, SelfTID, NumTasks);
+            memmove(arr.data(), result.data, result.size * sizeof(uint32_t));
+            free(result.data);
+
+            quickSelect(kth, arr, k, n, NumTasks);
             printf("kth element quick: %u\n", kth);
+            free(arr.data());
         }
 
         MPI_Barrier(MPI_COMM_WORLD);
@@ -116,55 +110,50 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    int sendCount = n / NumTasks;
-    int lastSendCount = sendCount + n % (sendCount * NumTasks);
+    ARRAY result = getWikiPartition(url, SelfTID, NumTasks);
+    printf("Result size: %zu\n", result.size);
 
-    std::vector<int> sendCounts(NumTasks, sendCount);
-    sendCounts[NumTasks - 1] = lastSendCount;
-    std::vector<int> disp(NumTasks);
+    std::vector<uint32_t> arr(result.size);
+    MPI_Barrier(MPI_COMM_WORLD);
 
-    for (int i = 1; i < NumTasks; i++)
-        disp[i] = disp[i - 1] + sendCounts[i - 1];
-
-    std::vector<std::vector<uint32_t>> arrs(NumTasks);
+    arr.resize(result.size);
+    printf("k = %ld\n", k);
 
     if (SelfTID == 0)
     {
         std::fstream file("kSearch.json", std::ios::out);
+        arr.resize(result.size);
+        std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin()); // copy to save time from re-reading the file
+        kSearch(kth, arr, k, n, NumTasks);
 
         ankerl::nanobench::Bench()
             .minEpochIterations(10)
             .epochs(3)
             .run("kSearch", [&]
-                 { for (int i = 0; i < NumTasks; i++)
-                    {
-                        arrs[i].resize(sendCounts[i]);
-                    }
-                    MPI_Scatterv(arr.data(), sendCounts.data(), disp.data(), MPI_UINT32_T, arrs[SelfTID].data(), sendCounts[SelfTID], MPI_UINT32_T, 0, MPI_COMM_WORLD);
-                    kSearch(kth, arrs[SelfTID], k, arr.size(), NumTasks); })
+                 {  arr.resize(result.size);
+                    std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
+                    kSearch(kth, arr, k, n, NumTasks); })
             .render(ankerl::nanobench::templates::pyperf(), file);
     }
     else
     {
+        arr.resize(result.size);
+        std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
+        kSearch(kth, arr, k, n, NumTasks);
         ankerl::nanobench::Bench()
             .minEpochIterations(10)
             .epochs(3)
             .output(nullptr)
             .run("kSearch", [&]
-                 { for (int i = 0; i < NumTasks; i++)
-                    {
-                        arrs[i].resize(sendCounts[i]);
-                    }
-                    MPI_Scatterv(arr.data(), sendCounts.data(), disp.data(), MPI_UINT32_T, arrs[SelfTID].data(), sendCounts[SelfTID], MPI_UINT32_T, 0, MPI_COMM_WORLD);
-                    kSearch(kth, arrs[SelfTID], k, arr.size(), NumTasks); });
+                 {  arr.resize(result.size);
+                    std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
+                    kSearch(kth, arr, k, n, NumTasks); });
     }
 
     if (SelfTID == 0)
         printf("kth element kSearch: %u\n", kth);
 
     MPI_Barrier(MPI_COMM_WORLD); // no need for a single barrier request, using Barrier_init, here, the use of the barrier is out of scope of the program (not included in the timings)
-
-    std::vector<std::vector<uint32_t>> arrs2(NumTasks);
 
     if (SelfTID == 0)
     {
@@ -174,12 +163,9 @@ int main(int argc, char **argv)
             .minEpochIterations(10)
             .epochs(3)
             .run("heurQuickSelect", [&]
-                 { for (int i = 0; i < NumTasks; i++)
-                    {
-                        arrs2[i].resize(sendCounts[i]);
-                    }
-                    MPI_Scatterv(arr.data(), sendCounts.data(), disp.data(), MPI_UINT32_T, arrs2[SelfTID].data(), lastSendCount, MPI_UINT32_T, 0, MPI_COMM_WORLD);
-                    heurQuickSelect(kth, arrs2[SelfTID], k, arr.size(), NumTasks); })
+                 {  arr.resize(result.size);
+                    std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
+                    heurQuickSelect(kth, arr, k, n, NumTasks); })
             .render(ankerl::nanobench::templates::pyperf(), file);
     }
     else
@@ -189,25 +175,15 @@ int main(int argc, char **argv)
             .epochs(3)
             .output(nullptr)
             .run("heurQuickSelect", [&]
-                 { for (int i = 0; i < NumTasks; i++)
-                    {
-                        arrs2[i].resize(sendCounts[i]);
-                    }
-                    MPI_Scatterv(arr.data(), sendCounts.data(), disp.data(), MPI_UINT32_T, arrs2[SelfTID].data(), lastSendCount, MPI_UINT32_T, 0, MPI_COMM_WORLD);
-                    heurQuickSelect(kth, arrs2[SelfTID], k, arr.size(), NumTasks); });
+                 {  arr.resize(result.size);
+                    std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
+                    heurQuickSelect(kth, arr, k, n, NumTasks); });
     }
 
     if (SelfTID == 0)
         printf("kth element heur quick: %u\n", kth);
 
     MPI_Barrier(MPI_COMM_WORLD);
-
-    std::vector<std::vector<uint32_t>> arrs3(NumTasks);
-
-    for (int i = 0; i < NumTasks; i++)
-    {
-        arrs3[i].resize(sendCounts[i]);
-    }
 
     if (SelfTID == 0)
     {
@@ -217,12 +193,9 @@ int main(int argc, char **argv)
             .minEpochIterations(10)
             .epochs(3)
             .run("quickSelect", [&]
-                 { for (int i = 0; i < NumTasks; i++)
-                    {
-                        arrs3[i].resize(sendCounts[i]);
-                    }
-                    MPI_Scatterv(arr.data(), sendCounts.data(), disp.data(), MPI_UINT32_T, arrs3[SelfTID].data(), lastSendCount, MPI_UINT32_T, 0, MPI_COMM_WORLD); 
-                    quickSelect(kth, arrs3[SelfTID], k, arr.size(), NumTasks); })
+                 {  arr.resize(result.size);
+                    std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
+                    quickSelect(kth, arr, k, n, NumTasks); })
             .render(ankerl::nanobench::templates::pyperf(), file);
     }
     else
@@ -232,12 +205,9 @@ int main(int argc, char **argv)
             .epochs(3)
             .output(nullptr)
             .run("quickSelect", [&]
-                 { for (int i = 0; i < NumTasks; i++)
-                    {
-                        arrs3[i].resize(sendCounts[i]);
-                    }
-                    MPI_Scatterv(arr.data(), sendCounts.data(), disp.data(), MPI_UINT32_T, arrs3[SelfTID].data(), lastSendCount, MPI_UINT32_T, 0, MPI_COMM_WORLD);
-                    quickSelect(kth, arrs3[SelfTID], k, arr.size(), NumTasks); });
+                 {  arr.resize(result.size);
+                    std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
+                    quickSelect(kth, arr, k, n, NumTasks); });
     }
 
     if (SelfTID == 0)
