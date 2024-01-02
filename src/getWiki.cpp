@@ -24,6 +24,47 @@ size_t write_callback(void *data, size_t size, size_t nmemb, void *destination)
   return realsize;
 }
 
+size_t getWikiInfo(const char *url, CURL *curl_handle)
+{
+  curl_global_init(CURL_GLOBAL_ALL);
+
+  curl_handle = curl_easy_init();
+
+  CURLcode res; // Error checking
+  double content_length;
+
+  if (curl_handle)
+  {
+    // Set up url
+    curl_easy_setopt(curl_handle, CURLOPT_URL, url);
+    // Get file total size. (No body yet)
+    curl_easy_setopt(curl_handle, CURLOPT_NOBODY, 1L);
+    // printf("Request1\n");
+    res = curl_easy_perform(curl_handle);
+    // printf("Request1 done\n");
+    if (res != CURLE_OK)
+    {
+      printf("Error in curl_easy_perform()\n");
+      exit(1);
+    }
+    else
+    {
+      res = curl_easy_getinfo(curl_handle, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &content_length);
+      if (res != CURLE_OK)
+      {
+        printf("Error in curl_easy_getinfo().\n");
+        exit(1);
+      }
+    }
+  }
+
+  curl_easy_cleanup(curl_handle);
+  curl_global_cleanup();
+
+  // Got size, convert to size_t.
+  return (size_t)content_length;
+}
+
 ARRAY getWikiPartition(const char *url, int world_rank, int world_size)
 {
   // Input checking
@@ -35,38 +76,16 @@ ARRAY getWikiPartition(const char *url, int world_rank, int world_size)
   CURL **curl_handle = (CURL **)malloc(world_size * sizeof(CURL *));
   CURL *local_curl_handle = curl_handle[world_rank];
   CURLcode res; // Error checking
-  double content_length;
   ARRAY result;
 
   curl_global_init(CURL_GLOBAL_ALL);
   MPI_Barrier(MPI_COMM_WORLD);
   local_curl_handle = curl_easy_init();
-  if (curl_handle)
+  if (local_curl_handle)
   {
-    // Set up url
-    curl_easy_setopt(local_curl_handle, CURLOPT_URL, url);
-    // Get file total size. (No body yet)
-    curl_easy_setopt(local_curl_handle, CURLOPT_NOBODY, 1L);
-    // printf("Request1\n");
-    res = curl_easy_perform(local_curl_handle);
-    // printf("Request1 done\n");
-    if (res != CURLE_OK)
-    {
-      printf("Error in curl_easy_perform()\n");
-      exit(1);
-    }
-    else
-    {
-      res = curl_easy_getinfo(local_curl_handle, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &content_length);
-      if (res != CURLE_OK)
-      {
-        printf("Error in curl_easy_getinfo().\n");
-        exit(1);
-      }
-    }
+    size_t file_byte_size = getWikiInfo(url, local_curl_handle);
     curl_easy_reset(local_curl_handle);
     // Got size, convert to size_t.
-    size_t file_byte_size = (size_t)content_length;
     printf("Got size: %zu\n", file_byte_size);
     // Round out to multiples of 4 since element size is 32 bits (ignore remainder)
     file_byte_size = (file_byte_size / 4) * 4;
@@ -94,27 +113,28 @@ ARRAY getWikiPartition(const char *url, int world_rank, int world_size)
     curl_easy_setopt(local_curl_handle, CURLOPT_WRITEDATA, (void *)&stream);
     // Get data..
     // printf("Request2\n");
-    res = curl_easy_perform(local_curl_handle);
-    // printf("Request2 done\n");
-    if (res != CURLE_OK)
+    for (int i = 0; i < world_size; i++)
     {
-      printf("Problem in data reception\n");
-      exit(1);
+      if (world_rank == i)
+      {
+        res = curl_easy_perform(local_curl_handle);
+        // printf("Request2 done\n");
+        if (res != CURLE_OK)
+        {
+          printf("Problem in data reception\n");
+          exit(1);
+        }
+        // Check if you got everything you asked for.
+        printf("Sizes: %zu %zu of process: %d\n", stream.current_byte_size, stream.total_byte_size, world_rank);
+      }
+      MPI_Barrier(MPI_COMM_WORLD);
     }
-    // Check if you got everything you asked for.
-    while (stream.current_byte_size < stream.total_byte_size)
-    {
-      // printf("MISSING %zu BYTES of process %d with range: %s\n", stream.total_byte_size - stream.current_byte_size, world_rank, range);
-      stream.current_byte_size = 0;
-      res = curl_easy_perform(local_curl_handle);
-    }
-    printf("Sizes: %zu %zu of process: %d\n", stream.current_byte_size, stream.total_byte_size, world_rank);
-    // Clean up and pass everything to the array struct.
 
     result.size = stream.current_byte_size / 4;
     result.data = (uint32_t *)malloc(result.size * sizeof(uint32_t));
     result.data = (uint32_t *)stream.data;
 
+    // Clean up and pass everything to the array struct.
     curl_easy_cleanup(local_curl_handle);
     MPI_Barrier(MPI_COMM_WORLD);
     curl_global_cleanup();
