@@ -2,7 +2,7 @@
   "configurations": [
     {
       "name": "Linux",
-      "includePath": ["${default}", "${workspaceFolder}/**", "/usr/include/**"],
+      "includePath": ["${default}", "${workspaceFolder}/**", "/usr/include/**", "/usr/lib/**"],
       "defines": [],
       "cStandard": "c17",
       "cppStandard": "c++20",

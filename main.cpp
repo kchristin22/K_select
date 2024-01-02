@@ -6,6 +6,7 @@
 #include "kSearch.hpp"
 #include "heurQuickSelect.hpp"
 #include "quickSelect.hpp"
+#include "getWiki.hpp"
 
 #define ANKERL_NANOBENCH_IMPLEMENT
 #include "nanobench.h"
@@ -38,15 +39,35 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    std::vector<uint32_t> arr;
-    uint32_t value;
-    while (file >> value)
-    {
-        arr.push_back(value);
-    }
+    // std::vector<uint32_t> arr;
+    // uint32_t value;
+    // while (file >> value)
+    // {
+    //     arr.push_back(value);
+    // }
 
-    file.close();
-    size_t n = arr.size();
+    // file.close();
+
+    int NumTasks, SelfTID;
+    uint32_t kth = 0;
+    size_t n = 0;
+
+    MPI_Init(NULL, NULL);
+
+    MPI_Comm_size(MPI_COMM_WORLD, &NumTasks);
+    MPI_Comm_rank(MPI_COMM_WORLD, &SelfTID);
+
+    int world_size = NumTasks;
+    int world_rank = SelfTID;
+    const char *url = "https://dumps.wikimedia.org/other/static_html_dumps/current/el/wikipedia-el-html.tar.7z";
+
+    ARRAY result = getWikiPartition(url, world_rank, world_size);
+    printf("Result size: %zu\n", result.size);
+
+    std::vector<uint32_t> arr(result.data, result.data + result.size);
+    free(result.data);
+
+    n = arr.size();
 
     if (argc == 2)
         k = n / 2;
@@ -56,14 +77,6 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    int NumTasks, SelfTID;
-    uint32_t kth = 0;
-
-    MPI_Init(NULL, NULL);
-
-    MPI_Comm_size(MPI_COMM_WORLD, &NumTasks);
-    MPI_Comm_rank(MPI_COMM_WORLD, &SelfTID);
-
     if (SelfTID == 0)
     {
         printf("k = %ld\n", k);
@@ -72,6 +85,8 @@ int main(int argc, char **argv)
         std::sort(std::execution::par_unseq, arrSort.begin(), arrSort.end());
         printf("kth correct: %u\n", arrSort[k - 1]);
     }
+    MPI_Barrier(MPI_COMM_WORLD);
+    exit(0);
 
     if (arr.size() < CACHE_SIZE) // check if the array fits in a single machine
     {
