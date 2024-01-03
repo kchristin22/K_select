@@ -59,7 +59,7 @@ void heurlocalSorting(localDataHeurQuick &local, std::vector<uint32_t> &arr, con
     else if (j == arr.size())
         j--;
 
-    while (i < j)
+    while (true)
     {
         while ((arr[i] <= p) && i <= j)
             i++; // the count (not the index, as it can reach the size of the array)
@@ -67,6 +67,8 @@ void heurlocalSorting(localDataHeurQuick &local, std::vector<uint32_t> &arr, con
             j--;
         if (i < j)
             std::swap(arr[i], arr[j]);
+        else
+            break; // i >= j
     }
 
     local.count = i; // save the count and not the index
@@ -84,7 +86,7 @@ void heurParSorting(localDataHeurQuick &local, std::vector<uint32_t> &arr, const
     else if (j == arr.size())
         j--;
 
-    while (i < j)
+    while (true)
     {
 #pragma omp parallel sections shared(i, j) // the i and j variables are altered in parallel, the array is scanned in both directions simultaneously
         {
@@ -103,6 +105,8 @@ void heurParSorting(localDataHeurQuick &local, std::vector<uint32_t> &arr, const
 
         if (i < j)
             std::swap(arr[i], arr[j]);
+        else
+            break; // i >= j
     }
 
     local.count = i; // save the count and not the index
@@ -180,43 +184,47 @@ void heurQuickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, 
     while (true)
     {
         if (countSum == prevCountSum)
-            prevCountSum = (k > countSum && prevP > p) ? prevCountSum + 1 : prevCountSum - 1;
+            prevCountSum = prevP > p ? prevCountSum + 1 : prevCountSum - 1; // change prevCountSum instead of countSum to not affect the next iteration of the algorithm
+                                                                            // this change drives the sign of the difference between the two pivots, by letting only the countSum-k relationship determine it:
+                                                                            // the pivot decreases if the countSum is bigger than k, and increases if the countSum is smaller than k
 
         // find new pivot through linear interpolation, and make sure it's not out of bounds
         int64_t fraction = ((static_cast<int64_t>(k) - static_cast<int64_t>(countSum)) * (static_cast<int64_t>(prevP) - static_cast<int64_t>(p))) / (static_cast<int64_t>(prevCountSum) - static_cast<int64_t>(countSum));
-        newP = static_cast<int64_t>(p) + fraction < 0 ? min : p + (uint32_t)fraction;
+        newP = static_cast<int64_t>(p) + fraction < 0 ? min : static_cast<int64_t>(p) + fraction;
         if (newP > max)
             newP = max;
         if (newP == p)
-            newP = (k > countSum) ? p + 1 : p - 1;
+            newP = (k > countSum || p == 0) ? p + 1 : p - 1; // ensure that the pivot doesnot underflow with p == 0 check
         else if (newP == prevP)
-            newP = (k > prevCountSum) ? prevP + 1 : prevP - 1; // avoid looping between two pivots
+            newP = (k > prevCountSum || prevP == 0) ? prevP + 1 : prevP - 1; // avoid looping between two pivots
 
         prevP = p;
         p = newP;
         prevCountSum = countSum;
 
-        heurParSorting(local, arr, start, end, p); // find local count
+        heurlocalSorting(local, arr, start, end, p); // find local count
 
         MPI_Allreduce(&local.count, &countSum, 1, MPI_UNSIGNED_LONG, MPI_SUM, proc); // also broadcasts the number of elements <= p so all processes can do calculations with it
 
-        // printf("p: %d, prevP: %d, prevCountSum: %ld, countSum: %ld\n", p, prevP, prevCountSum, countSum);
-
-        if (countSum >= k)
-        {
-            start = local.leftMargin;
-            end = local.count;               // search in the left part of the array
-            local.rightMargin = local.count; // limit the search space from the right, as we know that the kth element is in the left part
-        }
-        else
-        {
-            start = local.count; // search in the right part of the array
-            end = local.rightMargin;
-            local.leftMargin = local.count; // limit the search space from the left, as we know that the kth element is in the right part
-        }
+        // printf("p: %u, prevP: %u, prevCountSum: %ld, countSum: %ld\n", p, prevP, prevCountSum, countSum);
 
         if (k == countSum || countSum == (k - 1)) // if countSum is equal to k or k-1, then we can now find the kth element
             break;
+        if (countSum > k)
+        {
+            max = p; // mimic quickSelect's value range reduction
+            start = local.leftMargin;
+            end = local.count == arr.size() || local.count == 0 ? local.count : local.count - 1; // search in the left part of the array
+                                                                                                 // if the count is larger than the end position, then all elements of the previous range are <= p,
+                                                                                                 // else if they index of the last element <=p is the count - 1
+            local.rightMargin = end;                                                             // limit the search space from the right, as we know that the kth element is in the left part
+        }
+        else
+        {
+            start = local.count; // search in the right part of the array (the count points to the index of the first element that is >p)
+            end = local.rightMargin;
+            local.leftMargin = local.count; // limit the search space from the left, as we know that the kth element is in the right part
+        }
 
         if (abs(prevP - p) == 1) // check for the case where there are multiple instances of some values and the pivot alternates between them
         {
@@ -231,12 +239,18 @@ void heurQuickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, 
                 kth = prevP;
                 return;
             }
+            else if (p == 0 && countSum > k) // min element is 0 and is included in the array multiple times, cannot go lower than zero to fullfill the above conditions
+            {
+                kth = p;
+                return;
+            }
         }
 
         // gather the array if i) it is not gathered already, ii) the pivot is larger than the kth and iii) the size is small enough
         if (gathered == false && countSum > k && countSum < CACHE_SIZE / 2) // /2 to ensure that there's enough space to have two copies of the gathered array
         {
-            arr.erase(arr.begin() + local.count + 1, arr.end()); // remove the elements that are larger than the pivot, so there's enough space to gather the elements
+            if (local.count < arr.size())
+                arr.erase(arr.begin() + local.count, arr.end()); // remove the elements that are larger than the pivot, so there's enough space to gather the elements
             std::vector<uint32_t> tempArr(countSum);             // store local array
             std::vector<int> recvCount(np);
             std::vector<int> disp(np, 0);
@@ -263,8 +277,12 @@ void heurQuickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, 
             // reset start and end
             start = 0;
             end = arr.size() - 1;
+            local.leftMargin = 0;
+            local.rightMargin = arr.size() - 1;
         }
     }
+
+    // printf("p: %u, prevP: %u, countSum: %ld, prevCountSum: %ld\n", p, prevP, countSum, prevCountSum);
 
     bool (*comp)(const uint32_t &, const uint32_t &);
     setComp(comp, k, countSum); // set comp based on countSum and k's relation
@@ -273,7 +291,7 @@ void heurQuickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, 
 
     // make sure that start and end are inside the array
     start %= arr.size();
-    end %= arr.size(); // end refers to an index inside the array (see localSorting)
+    end = end == arr.size() ? end - 1 : end; // end refers to an index inside the array (see localSorting)
 
     // find local potential kth element
     findClosest(localDistance, arr, start, end, p, comp);
