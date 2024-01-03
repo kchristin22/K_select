@@ -2,7 +2,13 @@
   "configurations": [
     {
       "name": "Linux",
-      "includePath": ["${default}", "${workspaceFolder}/**", "/usr/include/**", "/usr/lib/**"],
+      "includePath": [
+        "${default}",
+        "${workspaceFolder}/**",
+        "/usr/lib/**",
+        "/usr/include/**",
+        "/usr/lib/x86_64-linux-gnu/openmpi/include/**"
+      ],
       "defines": [],
       "cStandard": "c17",
       "cppStandard": "c++20",

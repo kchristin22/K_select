@@ -117,7 +117,52 @@ int main(int argc, char **argv)
     MPI_Barrier(MPI_COMM_WORLD);
 
     arr.resize(result.size);
-    printf("k = %ld\n", k);
+
+    bool exit_flag = false;
+    for (size_t knew = 1; knew <= n; knew++)
+    {
+        if (SelfTID == 0)
+            printf("k = %ld of %ld\n", knew, n);
+        arr.resize(result.size);
+        std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
+        MPI_Barrier(MPI_COMM_WORLD);
+        kSearch(kth, arr, knew, n, NumTasks);
+        // printf("kSearch done\n");
+        uint32_t kth1 = kth;
+        arr.resize(result.size);
+        std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
+        MPI_Barrier(MPI_COMM_WORLD);
+        heurQuickSelect(kth, arr, knew, n, NumTasks);
+        // printf("heur done\n");
+        uint32_t kth2 = kth;
+        arr.resize(result.size);
+        std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
+        MPI_Barrier(MPI_COMM_WORLD);
+        quickSelect(kth, arr, knew, n, NumTasks);
+        // printf("quick done\n");
+        uint32_t kth3 = kth;
+        MPI_Barrier(MPI_COMM_WORLD);
+        if (SelfTID == 0)
+            if (kth1 != kth2 || kth1 != kth3 || kth2 != kth3)
+            {
+                printf("kth1: %u, kth2: %u, kth3: %u\n", kth1, kth2, kth3);
+                exit_flag = true;
+            }
+        MPI_Bcast(&exit_flag, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
+        if (exit_flag)
+            break;
+    }
+    return 0;
+
+    arr.resize(result.size);
+    std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
+    for (size_t i = 0; i < arr.size(); i++)
+    {
+        if (arr[i] == 60346)
+            printf("i: %ld\n", i);
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+    // return 0;
 
     if (SelfTID == 0)
     {
@@ -127,8 +172,8 @@ int main(int argc, char **argv)
         kSearch(kth, arr, k, n, NumTasks);
 
         ankerl::nanobench::Bench()
-            .minEpochIterations(10)
-            .epochs(3)
+            .minEpochIterations(1)
+            .epochs(1)
             .run("kSearch", [&]
                  {  arr.resize(result.size);
                     std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
@@ -141,8 +186,8 @@ int main(int argc, char **argv)
         std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
         kSearch(kth, arr, k, n, NumTasks);
         ankerl::nanobench::Bench()
-            .minEpochIterations(10)
-            .epochs(3)
+            .minEpochIterations(1)
+            .epochs(1)
             .output(nullptr)
             .run("kSearch", [&]
                  {  arr.resize(result.size);
@@ -160,8 +205,8 @@ int main(int argc, char **argv)
         std::fstream file("heurQuick.json", std::ios::out);
 
         ankerl::nanobench::Bench()
-            .minEpochIterations(10)
-            .epochs(3)
+            .minEpochIterations(1)
+            .epochs(1)
             .run("heurQuickSelect", [&]
                  {  arr.resize(result.size);
                     std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
@@ -171,8 +216,8 @@ int main(int argc, char **argv)
     else
     {
         ankerl::nanobench::Bench()
-            .minEpochIterations(10)
-            .epochs(3)
+            .minEpochIterations(1)
+            .epochs(1)
             .output(nullptr)
             .run("heurQuickSelect", [&]
                  {  arr.resize(result.size);
@@ -190,8 +235,8 @@ int main(int argc, char **argv)
         std::fstream file("quick.json", std::ios::out);
 
         ankerl::nanobench::Bench()
-            .minEpochIterations(10)
-            .epochs(3)
+            .minEpochIterations(1)
+            .epochs(1)
             .run("quickSelect", [&]
                  {  arr.resize(result.size);
                     std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
@@ -201,8 +246,8 @@ int main(int argc, char **argv)
     else
     {
         ankerl::nanobench::Bench()
-            .minEpochIterations(10)
-            .epochs(3)
+            .minEpochIterations(1)
+            .epochs(1)
             .output(nullptr)
             .run("quickSelect", [&]
                  {  arr.resize(result.size);
