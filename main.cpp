@@ -13,6 +13,47 @@
 
 #define URL_DEFAULT (char *)"https://dumps.wikimedia.org/other/static_html_dumps/current/el/wikipedia-el-html.tar.7z"
 
+void kCorrect(std::vector<uint32_t> &arr, const std::vector<uint32_t> &sorted_arr, const ARRAY &result, const int SelfTID, const size_t NumTasks)
+{
+    size_t n = sorted_arr.size();
+    uint32_t kth1 = 0, kth2 = 0, kth3 = 0;
+    bool exit_flag = false;
+    for (size_t k = 1; k <= n; k++)
+    {
+        if (SelfTID == 0)
+            printf("k = %ld of %ld\n", k, n);
+        arr.resize(result.size);
+        std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
+        MPI_Barrier(MPI_COMM_WORLD);
+        kSearch(kth1, arr, k, n, NumTasks);
+        // printf("kSearch done\n");
+        arr.resize(result.size);
+        std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
+        MPI_Barrier(MPI_COMM_WORLD);
+        heurQuickSelect(kth2, arr, k, n, NumTasks);
+        // printf("heur done\n");
+        arr.resize(result.size);
+        std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
+        MPI_Barrier(MPI_COMM_WORLD);
+        quickSelect(kth3, arr, k, n, NumTasks);
+        // printf("quick done\n");
+        MPI_Barrier(MPI_COMM_WORLD);
+        if (SelfTID == 0)
+        {
+            uint32_t kthCorrect = sorted_arr[k - 1];
+            if (kth1 != kth2 || kth1 != kth3 || kth2 != kth3 || kth1 != kthCorrect)
+            {
+                printf("kthCorrect: %u, kth1: %u, kth2: %u, kth3: %u\n", kthCorrect, kth1, kth2, kth3);
+                exit_flag = true;
+            }
+        }
+        MPI_Bcast(&exit_flag, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
+        if (exit_flag)
+            break;
+    }
+    return;
+}
+
 int main(int argc, char **argv)
 {
     size_t k = 1;
@@ -113,63 +154,24 @@ int main(int argc, char **argv)
     ARRAY result = getWikiPartition(url, SelfTID, NumTasks);
     printf("Result size: %zu\n", result.size);
 
+    std::string fileName = "sorted_data.txt";
+    std::vector<uint32_t> sorted_arr(n);
+    std::ifstream file(fileName);
+
+    size_t index = 0;
+
+    while (file >> sorted_arr[index])
+        index++;
+
+    printf("Sorted array size: %ld\n", index);
+
     std::vector<uint32_t> arr(result.size);
-    MPI_Barrier(MPI_COMM_WORLD);
 
-    arr.resize(result.size);
-
-    bool exit_flag = false;
-    for (size_t knew = 1; knew <= n; knew++)
-    {
-        if (SelfTID == 0)
-            printf("k = %ld of %ld\n", knew, n);
-        arr.resize(result.size);
-        std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
-        MPI_Barrier(MPI_COMM_WORLD);
-        kSearch(kth, arr, knew, n, NumTasks);
-        // printf("kSearch done\n");
-        uint32_t kth1 = kth;
-        arr.resize(result.size);
-        std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
-        MPI_Barrier(MPI_COMM_WORLD);
-        heurQuickSelect(kth, arr, knew, n, NumTasks);
-        // printf("heur done\n");
-        uint32_t kth2 = kth;
-        arr.resize(result.size);
-        std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
-        MPI_Barrier(MPI_COMM_WORLD);
-        quickSelect(kth, arr, knew, n, NumTasks);
-        // printf("quick done\n");
-        uint32_t kth3 = kth;
-        MPI_Barrier(MPI_COMM_WORLD);
-        if (SelfTID == 0)
-            if (kth1 != kth2 || kth1 != kth3 || kth2 != kth3)
-            {
-                printf("kth1: %u, kth2: %u, kth3: %u\n", kth1, kth2, kth3);
-                exit_flag = true;
-            }
-        MPI_Bcast(&exit_flag, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
-        if (exit_flag)
-            break;
-    }
-    return 0;
-
-    arr.resize(result.size);
-    std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
-    for (size_t i = 0; i < arr.size(); i++)
-    {
-        if (arr[i] == 60346)
-            printf("i: %ld\n", i);
-    }
-    MPI_Barrier(MPI_COMM_WORLD);
-    // return 0;
+    kCorrect(arr, sorted_arr, result, SelfTID, NumTasks); // call this if you want to validate all k's
 
     if (SelfTID == 0)
     {
         std::fstream file("kSearch.json", std::ios::out);
-        arr.resize(result.size);
-        std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin()); // copy to save time from re-reading the file
-        kSearch(kth, arr, k, n, NumTasks);
 
         ankerl::nanobench::Bench()
             .minEpochIterations(1)
@@ -182,9 +184,6 @@ int main(int argc, char **argv)
     }
     else
     {
-        arr.resize(result.size);
-        std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
-        kSearch(kth, arr, k, n, NumTasks);
         ankerl::nanobench::Bench()
             .minEpochIterations(1)
             .epochs(1)
@@ -196,7 +195,12 @@ int main(int argc, char **argv)
     }
 
     if (SelfTID == 0)
-        printf("kth element kSearch: %u\n", kth);
+    {
+        if (kth != sorted_arr[k - 1])
+            printf("Error! kSearch returned %u, while correct kth is %u\n", kth, sorted_arr[k - 1]);
+        else
+            printf("kth element kSearch: %u\n", kth);
+    }
 
     MPI_Barrier(MPI_COMM_WORLD); // no need for a single barrier request, using Barrier_init, here, the use of the barrier is out of scope of the program (not included in the timings)
 
@@ -226,7 +230,12 @@ int main(int argc, char **argv)
     }
 
     if (SelfTID == 0)
-        printf("kth element heur quick: %u\n", kth);
+    {
+        if (kth != sorted_arr[k - 1])
+            printf("Error! Heur quickselect returned %u, while correct kth is %u\n", kth, sorted_arr[k - 1]);
+        else
+            printf("kth element heur quick: %u\n", kth);
+    }
 
     MPI_Barrier(MPI_COMM_WORLD);
 
@@ -256,7 +265,12 @@ int main(int argc, char **argv)
     }
 
     if (SelfTID == 0)
-        printf("kth element quick: %u\n", kth);
+    {
+        if (kth != sorted_arr[k - 1])
+            printf("Error! Quickselect returned %u, while correct kth is %u\n", kth, sorted_arr[k - 1]);
+        else
+            printf("kth element quick: %u\n", kth);
+    }
 
     MPI_Barrier(MPI_COMM_WORLD);
 
