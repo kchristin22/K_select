@@ -1,4 +1,4 @@
-#include <algorithm>
+#include <atomic>
 #include <mpi.h>
 #include <omp.h>
 #include "quickSelect.hpp"
@@ -32,7 +32,8 @@ void localSorting(localDataQuick &local, std::vector<uint32_t> &arr, const size_
 
 void parSorting(localDataQuick &local, std::vector<uint32_t> &arr, const size_t start, const size_t end, const uint32_t p)
 {
-    size_t i = start, j = end;
+    std::atomic<size_t> i = start, j = end;
+
     if (i > j)
     {
         local.count = i;
@@ -43,17 +44,17 @@ void parSorting(localDataQuick &local, std::vector<uint32_t> &arr, const size_t 
 
     while (true)
     {
-#pragma omp parallel sections shared(i, j) // the i and j variables are altered in parallel, the array is scanned in both directions simultaneously
+#pragma omp parallel sections shared(i, j) num_threads(2) // the i and j variables are altered in parallel, the array is scanned in both directions simultaneously
         {
 #pragma omp section
             {
-                while ((arr[i] <= p) && i <= j)
+                while ((arr[i] <= p) && i <= j.load())
                     i++; // the count
             }
 
 #pragma omp section
             {
-                while ((arr[j] > p) && i < j)
+                while ((arr[j] > p) && i.load() < j)
                     j--;
             }
         }
@@ -159,8 +160,8 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
             {
                 // printf("start: %ld, end: %ld\n", start, end);
                 // if (end - start < 40)
-                    // for (size_t i = start; i <= end; i++)
-                        // printf("%u ", arr[i]);
+                // for (size_t i = start; i <= end; i++)
+                // printf("%u ", arr[i]);
                 if (end == 0 || start > end) // next pivot is out of range of the master (end = 0 only when count = 0)
                 {
                     master = (SelfTID + 1) % NumTasks; // assign the next process as a master

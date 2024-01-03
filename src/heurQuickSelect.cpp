@@ -1,4 +1,5 @@
 #include <limits.h>
+#include <atomic>
 #include <mpi.h>
 #include <omp.h>
 #include "heurQuickSelect.hpp"
@@ -77,7 +78,8 @@ void heurlocalSorting(localDataHeurQuick &local, std::vector<uint32_t> &arr, con
 
 void heurParSorting(localDataHeurQuick &local, std::vector<uint32_t> &arr, const size_t start, const size_t end, const uint32_t p)
 {
-    size_t i = start, j = end;
+    std::atomic<size_t> i = start, j = end;
+
     if (i > j)
     {
         local.count = i;
@@ -88,17 +90,17 @@ void heurParSorting(localDataHeurQuick &local, std::vector<uint32_t> &arr, const
 
     while (true)
     {
-#pragma omp parallel sections shared(i, j) // the i and j variables are altered in parallel, the array is scanned in both directions simultaneously
+#pragma omp parallel sections shared(i, j) num_threads(2) // the i and j variables are altered in parallel, the array is scanned in both directions simultaneously
         {
 #pragma omp section
             {
-                while ((arr[i] <= p) && i <= j)
+                while ((arr[i] <= p) && i <= j.load())
                     i++; // the count
             }
 
 #pragma omp section
             {
-                while ((arr[j] > p) && i < j)
+                while ((arr[j] > p) && i.load() < j)
                     j--;
             }
         }
