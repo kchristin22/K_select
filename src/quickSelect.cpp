@@ -89,7 +89,7 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
 
     while (true)
     {
-        parSorting(local, arr, start, end, p); // partition the array based on the pivot
+        localSorting(local, arr, start, end, p); // partition the array based on the pivot
 
         prevPrevP = prevP;
         prevP = p;
@@ -143,7 +143,7 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
 
             // reset start and end
             start = 0;
-            end = arr.size() - 1;
+            end = arr.size();
         }
 
         for (int i = 0; i < 2 * NumTasks; i++) // round robin to find the next master, check at most all processes if necessary
@@ -151,7 +151,7 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
         {
             if (master == SelfTID)
             {
-                if (end == 0 || start > end) // next pivot is out of range of the master
+                if (end == 0 || start > end) // next pivot is out of range of the master (end = 0 only when count = 0)
                 {
                     master = (SelfTID + 1) % NumTasks; // assign the next process as a master
                     previous = SelfTID;
@@ -161,7 +161,7 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
                     previous = master;
                     // we could shuflle the array, from start to end, before choosing the first fit value of this range
                     size_t tempEnd = end == arr.size() ? end - 1 : end;
-                    for (size_t i = start; i < tempEnd; i++) // end <= arr.size() - 1
+                    for (size_t i = start; i <= tempEnd; i++) // end <= arr.size() - 1
                     {
                         p = arr[i];
                         if (p != prevP && p != prevPrevP) // we want to choose a different pivot than the previous two to avoid infinite loops
