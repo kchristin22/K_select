@@ -1,5 +1,4 @@
 cmake_minimum_required(VERSION 3.25)
-set(CMAKE_CXX_COMPILER "/usr/bin/g++")
 message("${CMAKE_CXX_COMPILER}")
 project(K_SELECT)
 
