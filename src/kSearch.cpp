@@ -136,19 +136,19 @@ void kSearch(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, const si
     while (true)
     {
         if (countSumLess == prevCountSumLess)
-            prevCountSumLess = (k > countSumLess && prevP > p) ? prevCountSumLess + 1 : prevCountSumLess - 1; // change prevCountSum instead of countSum to not affect the next iteration of the algorithm
-                                                                                                              // this change drives the sign of the difference between the two pivots:
-                                                                                                              // the pivot decreases if the countSum is bigger than k, and increases if the countSum is smaller than k
+            prevCountSumLess = prevP > p ? prevCountSumLess + 1 : prevCountSumLess - 1; // change prevCountSum instead of countSum to not affect the next iteration of the algorithm
+                                                                                        // this change drives the sign of the difference between the two pivots, by letting only the countSum-k relationship determine it:
+                                                                                        // the pivot decreases if the countSum is bigger than k, and increases if the countSum is smaller than k
 
         // find new pivot through linear interpolation, and make sure it's not out of bounds
         int64_t fraction = ((static_cast<int64_t>(k) - static_cast<int64_t>(countSumLess)) * (static_cast<int64_t>(prevP) - static_cast<int64_t>(p))) / (static_cast<int64_t>(prevCountSumLess) - static_cast<int64_t>(countSumLess));
-        newP = static_cast<int64_t>(p) + fraction < 0 ? min : p + (uint32_t)fraction;
+        newP = static_cast<int64_t>(p) + fraction < 0 ? min : static_cast<int64_t>(p) + fraction;
         if (newP > max)
             newP = max;
         if (newP == p)
-            newP = (k > countSumLess) ? p + 1 : p - 1;
+            newP = (k > countSumLess || p == 0) ? p + 1 : p - 1; // ensure that the pivot doesnot underflow with p == 0 check
         else if (newP == prevP)
-            newP = (k > prevCountSumLess) ? prevP + 1 : prevP - 1; // avoid looping between two pivots
+            newP = (k > prevCountSumLess || prevP == 0) ? prevP + 1 : prevP - 1; // avoid looping between two pivots
 
         prevP = p;
         p = newP;
@@ -157,8 +157,6 @@ void kSearch(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, const si
         findLocalCount(local, arr, p, comp, k, n); // find the local number of elements that are less than or equal to the pivot
 
         MPI_Allreduce(&local.count, &countSumLess, 1, MPI_UNSIGNED_LONG, MPI_SUM, proc); // find the overall number and broadcast it so all processes can do calculations with it
-
-        // printf("p: %d, prevP: %d, prevCountSum: %ld, countSum: %ld\n", p, prevP, prevCountSumLess, countSumLess);
 
         if (abs(prevP - p) == 1) // check for the case where there are multiple instances of some values and the pivot alternates between them
         {
@@ -173,17 +171,26 @@ void kSearch(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, const si
                 kth = prevP;
                 return;
             }
+            else if (p == 0 && countSumLess > k) // min element is 0 and is included in the array multiple times, cannot go lower than zero to fullfill the above conditions
+            {
+                kth = p;
+                return;
+            }
         }
 
         if ((countSumLess == k) || (countSumLess == (k - 1))) // if countSum is equal to k or k-1, then we can now find the kth element
             break;
         else if (countSumLess > k)
+        {
             std::erase_if(arr, [p](uint32_t x)
                           { return x > p; }); // if countSum is bigger than k, then the kth element is smaller than the pivot
+            max = p;                          // mimic quickSelect's value range reduction
+        }
 
         if (gathered == false && countSumLess > k && countSumLess < CACHE_SIZE / 2) // /2 to ensure that there's enough space to have two copies of the gathered array
         {
-            arr.erase(arr.begin() + local.count + 1, arr.end()); // remove the elements that are larger than the pivot, so there's enough space to gather the elements
+            if (local.count < arr.size())
+                arr.erase(arr.begin() + local.count, arr.end()); // remove the elements that are larger than the pivot, so there's enough space to gather the elements
             std::vector<uint32_t> tempArr(countSumLess);         // store local array
             std::vector<int> recvCount(np);
             std::vector<int> disp(np, 0);

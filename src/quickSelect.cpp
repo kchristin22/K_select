@@ -1,4 +1,4 @@
-#include <algorithm>
+#include <atomic>
 #include <mpi.h>
 #include <omp.h>
 #include "quickSelect.hpp"
@@ -11,7 +11,7 @@ void localSorting(localDataQuick &local, std::vector<uint32_t> &arr, const size_
         local.count = i;
         return;
     }
-    else if (j == arr.size())
+    else if (j == arr.size()) // additional check, though it should never be true
         j--;
 
     while (true)
@@ -21,11 +21,9 @@ void localSorting(localDataQuick &local, std::vector<uint32_t> &arr, const size_
         while ((arr[j] > p) && i < j)
             j--;
         if (i < j)
-        {
             std::swap(arr[i], arr[j]);
-        }
         else
-            break;
+            break; // i >= j
     }
 
     local.count = i; // save the count and not the index
@@ -34,7 +32,8 @@ void localSorting(localDataQuick &local, std::vector<uint32_t> &arr, const size_
 
 void parSorting(localDataQuick &local, std::vector<uint32_t> &arr, const size_t start, const size_t end, const uint32_t p)
 {
-    size_t i = start, j = end;
+    std::atomic<size_t> i = start, j = end;
+
     if (i > j)
     {
         local.count = i;
@@ -43,25 +42,27 @@ void parSorting(localDataQuick &local, std::vector<uint32_t> &arr, const size_t 
     else if (j == arr.size())
         j--;
 
-    while (i < j)
+    while (true)
     {
-#pragma omp parallel sections shared(i, j) // the i and j variables are altered in parallel, the array is scanned in both directions simultaneously
+#pragma omp parallel sections shared(i, j) num_threads(2) // the i and j variables are altered in parallel, the array is scanned in both directions simultaneously
         {
 #pragma omp section
             {
-                while ((arr[i] <= p) && i <= j)
+                while ((arr[i] <= p) && i <= j.load())
                     i++; // the count
             }
 
 #pragma omp section
             {
-                while ((arr[j] > p) && i < j)
+                while ((arr[j] > p) && i.load() < j)
                     j--;
             }
         }
 
         if (i < j)
             std::swap(arr[i], arr[j]);
+        else
+            break; // i >= j
     }
 
     local.count = i; // save the count and not the index
@@ -89,7 +90,7 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
 
     while (true)
     {
-        parSorting(local, arr, start, end, p); // partition the array based on the pivot
+        localSorting(local, arr, start, end, p); // partition the array based on the pivot
 
         prevPrevP = prevP;
         prevP = p;
@@ -102,12 +103,14 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
         else if (countSum > k)
         {
             start = local.leftMargin;
-            end = local.count;               // search in the left part of the array
-            local.rightMargin = local.count; // limit the search space from the right, as we know that the kth element is in the left part
+            end = local.count == 0 ? local.count : local.count - 1; // search in the left part of the array
+                                                                    // if the count is larger than the end position, then all elements of the previous range are <= p,
+                                                                    // else if they index of the last element <=p is the count - 1
+            local.rightMargin = end;                                // limit the search space from the right, as we know that the kth element is in the left part
         }
         else
         {
-            start = local.count; // search in the right part of the array
+            start = local.count; // search in the right part of the array (the count points to the index of the first element that is >p)
             end = local.rightMargin;
             local.leftMargin = local.count; // limit the search space from the left, as we know that the kth element is in the right part
         }
@@ -115,7 +118,9 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
         // gather the array if i) it is not gathered already, ii) the pivot is larger than the kth and iii) the size is small enough
         if (gathered == false && countSum > k && countSum < CACHE_SIZE / 2) // /2 to ensure that there's enough space to have two copies of the gathered array
         {
-            arr.erase(arr.begin() + local.count + 1, arr.end()); // remove the elements that are larger than the pivot, so there's enough space to gather the elements
+            if (local.count < arr.size())
+                arr.erase(arr.begin() + local.count, arr.end()); // remove the elements that are larger than the pivot, so there's enough space to gather the elements
+
             std::vector<uint32_t> tempArr(countSum);             // store local array
             std::vector<int> recvCount(np);
             std::vector<int> disp(np, 0);
@@ -144,6 +149,8 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
             // reset start and end
             start = 0;
             end = arr.size() - 1;
+            local.leftMargin = 0;
+            local.rightMargin = arr.size() - 1;
         }
 
         for (int i = 0; i < 2 * NumTasks; i++) // round robin to find the next master, check at most all processes if necessary
@@ -151,7 +158,7 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
         {
             if (master == SelfTID)
             {
-                if (end == 0 || start > end) // next pivot is out of range of the master
+                if (end == 0 || start > end) // next pivot is out of range of the master (end = 0 only when count = 0)
                 {
                     master = (SelfTID + 1) % NumTasks; // assign the next process as a master
                     previous = SelfTID;
@@ -160,14 +167,14 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
                 { // new master has passed the test and can choose a new pivot
                     previous = master;
                     // we could shuflle the array, from start to end, before choosing the first fit value of this range
-                    size_t tempEnd = end == arr.size() ? end - 1 : end;
-                    for (size_t i = start; i < tempEnd; i++) // end <= arr.size() - 1
+                    size_t tempEnd = end == arr.size() ? end - 1 : end; // additional check, though it should never be true
+                    for (size_t i = start; i <= tempEnd; i++)           // end <= arr.size() - 1
                     {
                         p = arr[i];
                         if (p != prevP && p != prevPrevP) // we want to choose a different pivot than the previous two to avoid infinite loops
                             break;
 
-                        if (i == (tempEnd - 1)) // this master has only elements equal to the previous pivots
+                        if (i == tempEnd) // this master has only elements equal to the previous pivots
                             master = (SelfTID + 1) % NumTasks;
                     }
                 }
