@@ -57,7 +57,7 @@ void heurlocalSorting(localDataHeurQuick &local, std::vector<uint32_t> &arr, con
         local.count = i;
         return;
     }
-    else if (j == arr.size())
+    else if (j == arr.size()) // additional check, though it should never be true
         j--;
 
     while (true)
@@ -85,7 +85,7 @@ void heurParSorting(localDataHeurQuick &local, std::vector<uint32_t> &arr, const
         local.count = i;
         return;
     }
-    else if (j == arr.size())
+    else if (j == arr.size()) 
         j--;
 
     while (true)
@@ -208,15 +208,13 @@ void heurQuickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, 
 
         MPI_Allreduce(&local.count, &countSum, 1, MPI_UNSIGNED_LONG, MPI_SUM, proc); // also broadcasts the number of elements <= p so all processes can do calculations with it
 
-        // printf("p: %u, prevP: %u, prevCountSum: %ld, countSum: %ld\n", p, prevP, prevCountSum, countSum);
-
         if (k == countSum || countSum == (k - 1)) // if countSum is equal to k or k-1, then we can now find the kth element
             break;
         if (countSum > k)
         {
             max = p; // mimic quickSelect's value range reduction
             start = local.leftMargin;
-            end = local.count == arr.size() || local.count == 0 ? local.count : local.count - 1; // search in the left part of the array
+            end = local.count == 0 ? local.count : local.count - 1; // search in the left part of the array
                                                                                                  // if the count is larger than the end position, then all elements of the previous range are <= p,
                                                                                                  // else if they index of the last element <=p is the count - 1
             local.rightMargin = end;                                                             // limit the search space from the right, as we know that the kth element is in the left part
@@ -283,8 +281,6 @@ void heurQuickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, 
             local.rightMargin = arr.size() - 1;
         }
     }
-
-    // printf("p: %u, prevP: %u, countSum: %ld, prevCountSum: %ld\n", p, prevP, countSum, prevCountSum);
 
     bool (*comp)(const uint32_t &, const uint32_t &);
     setComp(comp, k, countSum); // set comp based on countSum and k's relation

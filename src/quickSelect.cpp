@@ -11,7 +11,7 @@ void localSorting(localDataQuick &local, std::vector<uint32_t> &arr, const size_
         local.count = i;
         return;
     }
-    else if (j == arr.size())
+    else if (j == arr.size()) // additional check, though it should never be true
         j--;
 
     while (true)
@@ -97,17 +97,16 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
         prevCountSum = countSum;
 
         MPI_Allreduce(&local.count, &countSum, 1, MPI_UNSIGNED_LONG, MPI_SUM, proc); // also broadcasts the number of elements <= p so all processes can do calculations with it
-        // printf("p: %u, prevP: %u, countSum: %ld, prevCountSum: %ld, start: %ld, end: %ld, proc: %d\n", prevP, prevPrevP, countSum, prevCountSum, start, end, SelfTID);
 
         if (countSum == k) // if countSum is equal to k, then the current pivot is the kth element
             break;
         else if (countSum > k)
         {
             start = local.leftMargin;
-            end = local.count == arr.size() || local.count == 0 ? local.count : local.count - 1; // search in the left part of the array
-                                                                                                 // if the count is larger than the end position, then all elements of the previous range are <= p,
-                                                                                                 // else if they index of the last element <=p is the count - 1
-            local.rightMargin = end;                                                             // limit the search space from the right, as we know that the kth element is in the left part
+            end = local.count == 0 ? local.count : local.count - 1; // search in the left part of the array
+                                                                    // if the count is larger than the end position, then all elements of the previous range are <= p,
+                                                                    // else if they index of the last element <=p is the count - 1
+            local.rightMargin = end;                                // limit the search space from the right, as we know that the kth element is in the left part
         }
         else
         {
@@ -158,10 +157,6 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
         {
             if (master == SelfTID)
             {
-                // printf("start: %ld, end: %ld\n", start, end);
-                // if (end - start < 40)
-                // for (size_t i = start; i <= end; i++)
-                // printf("%u ", arr[i]);
                 if (end == 0 || start > end) // next pivot is out of range of the master (end = 0 only when count = 0)
                 {
                     master = (SelfTID + 1) % NumTasks; // assign the next process as a master
@@ -171,8 +166,8 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
                 { // new master has passed the test and can choose a new pivot
                     previous = master;
                     // we could shuflle the array, from start to end, before choosing the first fit value of this range
-                    size_t tempEnd = end == arr.size() ? end - 1 : end;
-                    for (size_t i = start; i <= tempEnd; i++) // end <= arr.size() - 1
+                    size_t tempEnd = end == arr.size() ? end - 1 : end; // additional check, though it should never be true
+                    for (size_t i = start; i <= tempEnd; i++)           // end <= arr.size() - 1
                     {
                         p = arr[i];
                         if (p != prevP && p != prevPrevP) // we want to choose a different pivot than the previous two to avoid infinite loops
@@ -182,7 +177,6 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
                             master = (SelfTID + 1) % NumTasks;
                     }
                 }
-                // printf("master: %d, previous: %d, p: %u\n", master, previous, p);
             }
             MPI_Bcast(&master, 1, MPI_INT, previous, proc); // broadcast new master
             if (master == previous)                         // the master has passed the tests

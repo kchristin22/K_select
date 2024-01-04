@@ -142,7 +142,6 @@ void kSearch(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, const si
 
         // find new pivot through linear interpolation, and make sure it's not out of bounds
         int64_t fraction = ((static_cast<int64_t>(k) - static_cast<int64_t>(countSumLess)) * (static_cast<int64_t>(prevP) - static_cast<int64_t>(p))) / (static_cast<int64_t>(prevCountSumLess) - static_cast<int64_t>(countSumLess));
-        // printf("fraction: %ld\n", fraction);
         newP = static_cast<int64_t>(p) + fraction < 0 ? min : static_cast<int64_t>(p) + fraction;
         if (newP > max)
             newP = max;
@@ -158,8 +157,6 @@ void kSearch(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, const si
         findLocalCount(local, arr, p, comp, k, n); // find the local number of elements that are less than or equal to the pivot
 
         MPI_Allreduce(&local.count, &countSumLess, 1, MPI_UNSIGNED_LONG, MPI_SUM, proc); // find the overall number and broadcast it so all processes can do calculations with it
-
-        // printf("p: %u, prevP: %u, countSum: %ld, prevCountSum: %ld\n", p, prevP, countSumLess, prevCountSumLess);
 
         if (abs(prevP - p) == 1) // check for the case where there are multiple instances of some values and the pivot alternates between them
         {
