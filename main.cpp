@@ -13,12 +13,12 @@
 
 #define URL_DEFAULT (char *)"https://dumps.wikimedia.org/other/static_html_dumps/current/el/wikipedia-el-html.tar.7z"
 
-void kCorrect(std::vector<uint32_t> &arr, const std::vector<uint32_t> &sorted_arr, const ARRAY &result, const int SelfTID, const size_t NumTasks)
+void kCorrect(std::vector<uint32_t> &arr, const std::vector<uint32_t> &sorted_arr, const ARRAY &result, const size_t start, const size_t end, const int SelfTID, const size_t NumTasks)
 {
     size_t n = sorted_arr.size();
     uint32_t kth1 = 0, kth2 = 0, kth3 = 0;
     bool exit_flag = false;
-    for (size_t k = 1; k <= n; k++)
+    for (size_t k = start; k <= end; k++)
     {
         if (SelfTID == 0)
             printf("k = %ld of %ld\n", k, n);
@@ -101,15 +101,6 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    // if (SelfTID == 0)
-    // {
-    //     printf("k = %ld\n", k);
-    //     std::vector<uint32_t> arrSort(n);
-    //     arrSort = arr;
-    //     std::sort(std::execution::par_unseq, arrSort.begin(), arrSort.end());
-    //     printf("kth correct: %u\n", arrSort[k - 1]);
-    // }
-
     if (n < CACHE_SIZE) // check if the array fits in a single machine
     {
         NumTasks = 1;
@@ -165,17 +156,22 @@ int main(int argc, char **argv)
 
     printf("Sorted array size: %ld\n", index);
 
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    if (SelfTID == 0)
+        printf("kth = %u\n", sorted_arr[k - 1]);
+
     std::vector<uint32_t> arr(result.size);
 
-    kCorrect(arr, sorted_arr, result, SelfTID, NumTasks); // call this if you want to validate all k's
+    // kCorrect(arr, sorted_arr, result, 1, n, SelfTID, NumTasks); // call this if you want to validate a range of k's
 
     if (SelfTID == 0)
     {
         std::fstream file("kSearch.json", std::ios::out);
 
         ankerl::nanobench::Bench()
-            .minEpochIterations(1)
-            .epochs(1)
+            .minEpochIterations(10)
+            .epochs(5)
             .run("kSearch", [&]
                  {  arr.resize(result.size);
                     std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
@@ -185,8 +181,8 @@ int main(int argc, char **argv)
     else
     {
         ankerl::nanobench::Bench()
-            .minEpochIterations(1)
-            .epochs(1)
+            .minEpochIterations(10)
+            .epochs(5)
             .output(nullptr)
             .run("kSearch", [&]
                  {  arr.resize(result.size);
@@ -209,8 +205,8 @@ int main(int argc, char **argv)
         std::fstream file("heurQuick.json", std::ios::out);
 
         ankerl::nanobench::Bench()
-            .minEpochIterations(1)
-            .epochs(1)
+            .minEpochIterations(10)
+            .epochs(5)
             .run("heurQuickSelect", [&]
                  {  arr.resize(result.size);
                     std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
@@ -220,8 +216,8 @@ int main(int argc, char **argv)
     else
     {
         ankerl::nanobench::Bench()
-            .minEpochIterations(1)
-            .epochs(1)
+            .minEpochIterations(10)
+            .epochs(5)
             .output(nullptr)
             .run("heurQuickSelect", [&]
                  {  arr.resize(result.size);
@@ -244,8 +240,8 @@ int main(int argc, char **argv)
         std::fstream file("quick.json", std::ios::out);
 
         ankerl::nanobench::Bench()
-            .minEpochIterations(1)
-            .epochs(1)
+            .minEpochIterations(10)
+            .epochs(5)
             .run("quickSelect", [&]
                  {  arr.resize(result.size);
                     std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
@@ -255,8 +251,8 @@ int main(int argc, char **argv)
     else
     {
         ankerl::nanobench::Bench()
-            .minEpochIterations(1)
-            .epochs(1)
+            .minEpochIterations(10)
+            .epochs(5)
             .output(nullptr)
             .run("quickSelect", [&]
                  {  arr.resize(result.size);
