@@ -120,6 +120,7 @@ void quickSelect(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, cons
         {
             if (local.count < arr.size())
                 arr.erase(arr.begin() + local.count, arr.end()); // remove the elements that are larger than the pivot, so there's enough space to gather the elements
+
             std::vector<uint32_t> tempArr(countSum);             // store local array
             std::vector<int> recvCount(np);
             std::vector<int> disp(np, 0);
