@@ -1,14 +1,17 @@
 #!/bin/bash
 #SBATCH --job-name=k_select
 #SBATCH --partition=rome
-#SBATCH --ntasks=8
+#SBATCH --nodes=4
+#SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=2
-#SBATCH --time=10:00
+#SBATCH --time=7:00
 
 module load gcc/12.2.0 openmpi curl/8.0.1-clqyiyn cmake
 
-cd ../build
+mkdir -p build
+cd build/
 cmake ..
 cmake --build .
-cd ../bin
-srun -n $SLURM_NTASKS ./output 397
+cd bin/
+cp ../../sorted_data.txt .
+srun -N $SLURM_JOB_NUM_NODES --ntasks-per-node $SLURM_NTASKS_PER_NODE ./output 397
