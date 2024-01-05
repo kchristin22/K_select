@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --job-name=k_select
-#SBATCH --partition=rome
+#SBATCH --partition=batch
 #SBATCH --nodes=4
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=2
-#SBATCH --time=7:00
+#SBATCH --time=3:00
 
 module load gcc/12.2.0 openmpi curl/8.0.1-clqyiyn cmake
 

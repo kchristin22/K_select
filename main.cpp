@@ -1,7 +1,6 @@
 #include <iostream>
 #include <fstream>
 #include <algorithm>
-#include <execution>
 #include <mpi.h>
 #include "kSearch.hpp"
 #include "heurQuickSelect.hpp"
@@ -23,17 +22,17 @@ void kCorrect(std::vector<uint32_t> &arr, const std::vector<uint32_t> &sorted_ar
         if (SelfTID == 0)
             printf("k = %ld of %ld\n", k, n);
         arr.resize(result.size);
-        std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
+        std::copy(result.data, result.data + result.size, arr.begin());
         MPI_Barrier(MPI_COMM_WORLD);
         kSearch(kth1, arr, k, n, NumTasks);
         // printf("kSearch done\n");
         arr.resize(result.size);
-        std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
+        std::copy(result.data, result.data + result.size, arr.begin());
         MPI_Barrier(MPI_COMM_WORLD);
         heurQuickSelect(kth2, arr, k, n, NumTasks);
         // printf("heur done\n");
         arr.resize(result.size);
-        std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
+        std::copy(result.data, result.data + result.size, arr.begin());
         MPI_Barrier(MPI_COMM_WORLD);
         quickSelect(kth3, arr, k, n, NumTasks);
         // printf("quick done\n");
@@ -174,7 +173,7 @@ int main(int argc, char **argv)
             .epochs(5)
             .run("kSearch", [&]
                  {  arr.resize(result.size);
-                    std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
+                    std::copy(result.data, result.data + result.size, arr.begin());
                     kSearch(kth, arr, k, n, NumTasks); })
             .render(ankerl::nanobench::templates::pyperf(), file);
     }
@@ -186,7 +185,7 @@ int main(int argc, char **argv)
             .output(nullptr)
             .run("kSearch", [&]
                  {  arr.resize(result.size);
-                    std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
+                    std::copy(result.data, result.data + result.size, arr.begin());
                     kSearch(kth, arr, k, n, NumTasks); });
     }
 
@@ -209,7 +208,7 @@ int main(int argc, char **argv)
             .epochs(5)
             .run("heurQuickSelect", [&]
                  {  arr.resize(result.size);
-                    std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
+                    std::copy(result.data, result.data + result.size, arr.begin());
                     heurQuickSelect(kth, arr, k, n, NumTasks); })
             .render(ankerl::nanobench::templates::pyperf(), file);
     }
@@ -221,7 +220,7 @@ int main(int argc, char **argv)
             .output(nullptr)
             .run("heurQuickSelect", [&]
                  {  arr.resize(result.size);
-                    std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
+                    std::copy(result.data, result.data + result.size, arr.begin());
                     heurQuickSelect(kth, arr, k, n, NumTasks); });
     }
 
@@ -244,7 +243,7 @@ int main(int argc, char **argv)
             .epochs(5)
             .run("quickSelect", [&]
                  {  arr.resize(result.size);
-                    std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
+                    std::copy(result.data, result.data + result.size, arr.begin());
                     quickSelect(kth, arr, k, n, NumTasks); })
             .render(ankerl::nanobench::templates::pyperf(), file);
     }
@@ -256,7 +255,7 @@ int main(int argc, char **argv)
             .output(nullptr)
             .run("quickSelect", [&]
                  {  arr.resize(result.size);
-                    std::copy(std::execution::par_unseq, result.data, result.data + result.size, arr.begin());
+                    std::copy(result.data, result.data + result.size, arr.begin());
                     quickSelect(kth, arr, k, n, NumTasks); });
     }
 
