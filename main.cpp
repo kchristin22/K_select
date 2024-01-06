@@ -156,14 +156,27 @@ int main(int argc, char **argv)
 
     printf("Sorted array size: %ld\n", index);
 
-    MPI_Barrier(MPI_COMM_WORLD);
-
     if (SelfTID == 0)
         printf("kth = %u\n", sorted_arr[k - 1]);
 
     std::vector<uint32_t> arr(result.size);
 
     // kCorrect(arr, sorted_arr, result, 1, n, SelfTID, NumTasks); // call this if you want to validate a range of k's
+
+    if (SelfTID == 0)
+    {
+        std::fstream file("std_copy.json", std::ios::out);
+
+        ankerl::nanobench::Bench()
+            .minEpochIterations(10)
+            .epochs(5)
+            .run("std_copy", [&]
+                 {  arr.resize(result.size);
+                    std::copy(result.data, result.data + result.size, arr.begin()); })
+            .render(ankerl::nanobench::templates::pyperf(), file);
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
 
     if (SelfTID == 0)
     {
