@@ -155,18 +155,35 @@ int main(int argc, char **argv)
 
     printf("Sorted array size: %ld\n", index);
 
-    MPI_Barrier(MPI_COMM_WORLD);
-
     if (SelfTID == 0)
         printf("kth = %u\n", sorted_arr[k - 1]);
 
     std::vector<uint32_t> arr(result.size);
 
+    if (SelfTID == 0)
+    {
+        char filename[50];
+        std::sprintf(filename, "std_copy_k_%ld.json", k);
+        std::fstream file(filename, std::ios::out);
+
+        ankerl::nanobench::Bench()
+            .minEpochIterations(10)
+            .epochs(5)
+            .run("std_copy", [&]
+                 {  arr.resize(result.size);
+                    std::copy(result.data, result.data + result.size, arr.begin()); })
+            .render(ankerl::nanobench::templates::pyperf(), file);
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
     // kCorrect(arr, sorted_arr, result, 1, n, SelfTID, NumTasks); // call this if you want to validate a range of k's
 
     if (SelfTID == 0)
     {
-        std::fstream file("kSearch.json", std::ios::out);
+        char filename[50];
+        std::sprintf(filename, "kSearch_k_%ld.json", k);
+        std::fstream file(filename, std::ios::out);
 
         ankerl::nanobench::Bench()
             .minEpochIterations(10)
@@ -201,7 +218,9 @@ int main(int argc, char **argv)
 
     if (SelfTID == 0)
     {
-        std::fstream file("heurQuick.json", std::ios::out);
+        char filename[50];
+        std::sprintf(filename, "heurQuick_k_%ld.json", k);
+        std::fstream file(filename, std::ios::out);
 
         ankerl::nanobench::Bench()
             .minEpochIterations(10)
@@ -236,7 +255,9 @@ int main(int argc, char **argv)
 
     if (SelfTID == 0)
     {
-        std::fstream file("quick.json", std::ios::out);
+        char filename[50];
+        std::sprintf(filename, "quick_k_%ld.json", k);
+        std::fstream file(filename, std::ios::out);
 
         ankerl::nanobench::Bench()
             .minEpochIterations(10)

@@ -14,4 +14,4 @@ cmake ..
 cmake --build .
 cd bin/
 cp ../../sorted_data.txt .
-srun -N $SLURM_JOB_NUM_NODES --ntasks-per-node $SLURM_NTASKS_PER_NODE ./output 397
+srun -N $SLURM_JOB_NUM_NODES --ntasks-per-node $SLURM_NTASKS_PER_NODE ./output 14042179 # k = n / 2
