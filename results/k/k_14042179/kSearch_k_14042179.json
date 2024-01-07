@@ -1,0 +1,24 @@
+{
+    "benchmarks": [
+        {
+            "runs": [
+                {
+                    "values": [
+                        0.1052510306,
+                        0.1002423715,
+                        0.0999892134,
+                        0.099822101,
+                        0.099754451
+                    ]
+                }
+            ]
+        }
+    ],
+    "metadata": {
+        "loops": 52,
+        "inner_loops": 1,
+        "name": "benchmark",
+        "unit": "second"
+    },
+    "version": "1.0"
+}
