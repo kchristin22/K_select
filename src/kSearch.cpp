@@ -146,7 +146,7 @@ void kSearch(uint32_t &kth, std::vector<uint32_t> &arr, const size_t k, const si
         if (newP > max)
             newP = max;
         if (newP == p)
-            newP = (k > countSumLess || p == 0) ? p + 1 : p - 1; // ensure that the pivot doesnot underflow with p == 0 check
+            newP = (k > countSumLess || p == 0) ? p + 1 : p - 1; // ensure that the pivot does not underflow with p == 0 check
         else if (newP == prevP)
             newP = (k > prevCountSumLess || prevP == 0) ? prevP + 1 : prevP - 1; // avoid looping between two pivots
 
