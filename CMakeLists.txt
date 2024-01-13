@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.25)
-message("${CMAKE_CXX_COMPILER}")
 project(K_SELECT)
 
+set(CMAKE_CXX_COMPILER mpic++)
+message("${CMAKE_CXX_COMPILER}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++20 -fopenmp -O3 -ftree-vectorize")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
