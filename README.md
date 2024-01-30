@@ -15,13 +15,14 @@ to fit in one machine, thus making the use of MPI necessary. Three different ver
 
 To successfully compile and run the program you need to execute the follow commands:
 
-1. `mkdri -p build`
-2. `cd build/`
-3. `cmake ..`
-4. `cmake --build .`
-5. `cd bin/`
-6. `cp ../../sorted_data.txt .` # the file where the sorted array is placed, in order to check the correctness of the results. In case of the [default url](https://dumps.wikimedia.org/other/static_html_dumps/current/el/wikipedia-el-html.tar.7z), the sorted array can be found [here](https://drive.google.com/file/d/14oI-r5W7kl2FcGCbQ1Udg1GPARdabDDE/view?usp=sharing). The file name "sorted_data.txt" is hardcoded in the program. If the file is larger than the one denoted by the url, the program will fail. If you don't want to evaluate the correctness of the program, you may not include the "sorted_data.txt" file in your bin folder or comment out lines 154-155 in `main.cpp`
-7. `mpirun ./output ${k} ${url}` # the arguments are optional
+1. `rm -f -r build/`
+2. `mkdir build`
+3. `cd build/`
+4. `cmake ..`
+5. `cmake --build .`
+6. `cd bin/`
+7. `cp ../../sorted_data.txt .` # the file where the sorted array is placed, in order to check the correctness of the results. In case of the [default url](https://dumps.wikimedia.org/other/static_html_dumps/current/el/wikipedia-el-html.tar.7z), the sorted array can be found [here](https://drive.google.com/file/d/14oI-r5W7kl2FcGCbQ1Udg1GPARdabDDE/view?usp=sharing). The file name "sorted_data.txt" is hardcoded in the program. If the file is larger than the one denoted by the url, the program will fail. If you don't want to evaluate the correctness of the program, you may not include the "sorted_data.txt" file in your bin folder or comment out lines 154-155 in `main.cpp`
+8. `mpirun ./output ${k} ${url}` # the arguments are optional
 
 ### Notes
 * MPICH has a bug regarding performing reduction with elements of type uint32_t. Make sure to use OpenMPI instead.
