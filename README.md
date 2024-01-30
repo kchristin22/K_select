@@ -20,7 +20,7 @@ To successfully compile and run the program you need to execute the follow comma
 3. `cmake ..`
 4. `cmake --build .`
 5. `cd bin/`
-6. `cp ../../sorted_data.txt .` # the file where the sorted array is placed, in order to check the correctness of the results. In case of the [default url](https://dumps.wikimedia.org/other/static_html_dumps/current/el/wikipedia-el-html.tar.7z), the sorted array can be found [here](https://drive.google.com/file/d/14oI-r5W7kl2FcGCbQ1Udg1GPARdabDDE/view?usp=sharing). The file name "sorted_data.txt" is hardcoded in the program.
+6. `cp ../../sorted_data.txt .` # the file where the sorted array is placed, in order to check the correctness of the results. In case of the [default url](https://dumps.wikimedia.org/other/static_html_dumps/current/el/wikipedia-el-html.tar.7z), the sorted array can be found [here](https://drive.google.com/file/d/14oI-r5W7kl2FcGCbQ1Udg1GPARdabDDE/view?usp=sharing). The file name "sorted_data.txt" is hardcoded in the program. If the file is larger than the one denoted by the url, the program will fail.
 7. `mpirun ./output ${k} ${url}` # the arguments are optional
 
 ### Notes
